@@ -1,0 +1,35 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+frontend/.env*
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node / React
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Confidential screenplay data
+data/input/
+data/processed/
+data/uploads/
+
+# Generated outputs containing screenplay text
+outputs/
+# React app snapshot (contains transcripts). Regenerate: python scripts/sync_frontend_data.py
+frontend/src/data/promos.json
+
+# OS files
+.DS_Store
+Thumbs.db
+submission/raw_outputs/

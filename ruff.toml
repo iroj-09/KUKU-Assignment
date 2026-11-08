@@ -1,0 +1,12 @@
+# `ruff check` should be clean. Style (line length etc.) is deliberately not enforced.
+line-length = 120
+target-version = "py312"
+extend-exclude = [".venv", "frontend", "outputs", "data", "submission"]
+
+[lint]
+select = ["E9", "F", "B", "S102", "S307", "S506", "S602", "S605", "S608", "S105", "S106", "S107"]
+ignore = ["B008"]
+
+[lint.per-file-ignores]
+"tests/*" = ["S603", "S101"]
+"run_all.py" = ["S603"]   # runs this project's own scripts with a fixed argument list (no shell)

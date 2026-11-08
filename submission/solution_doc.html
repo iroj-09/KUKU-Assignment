@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kuku AI Generalist Assignment — Problem 1: Find the Promos</title>
+<style>
+  @page { size: A4; margin: 12mm 13mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 8.9pt; line-height: 1.32; color: #1c1c1c; margin: 0; }
+  h1 { font-size: 14.5pt; margin: 0 0 1px; }
+  .sub { color: #555; font-size: 8.4pt; margin-bottom: 5px; }
+  h2 { font-size: 10pt; margin: 8px 0 2px; border-bottom: 1px solid #ddd; padding-bottom: 1px; color: #7a1030; }
+  p { margin: 2px 0; }
+  ul { margin: 2px 0 2px 15px; padding: 0; }
+  li { margin: 1px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 3px 0; font-size: 8.4pt; }
+  th, td { border: 1px solid #ddd; padding: 2px 5px; text-align: left; vertical-align: top; }
+  th { background: #f5f0f2; }
+  code { font-family: Consolas, monospace; font-size: 8.2pt; background: #f3f3f3; padding: 0 2px; }
+  .fill { background: #fff3b0; padding: 0 2px; }
+  .cols { display: flex; gap: 12px; }
+  .cols > div { flex: 1; }
+</style>
+</head>
+<body>
+
+<h1>Find the Promos — screenplay in, ranked promo list out</h1>
+<div class="sub"><span class="fill">[Your name · roll no. · branch]</span> · Problem 1 · Prototype: <span class="fill">[repo link]</span> · Raw outputs: <span class="fill">[folder link]</span> · Video: <span class="fill">[link]</span></div>
+
+<h2>1. Why Problem 1, and how I scoped it</h2>
+<p>It is a weekly bottleneck (an editor watches every episode of every new show), it comes with real data (50 episodes), and its output is checkable: an episode, start/end times, a hook, a cliffhanger. I scoped it to <b>one step of the editor's work: producing a ranked shortlist of candidate promos</b>. The editor still watches and cuts; the tool decides where to look first.</p>
+
+<h2>2. Assumptions (the brief was silent)</h2>
+<ul>
+  <li>The screenplay timestamps are my only evidence. "First 3 s / last 5 s" are measured in screenplay seconds; I cannot see acting, visuals or music.</li>
+  <li>A promo is <b>one continuous 20–60 s stretch that starts and ends on event boundaries</b>, so no line is cut in half. Promos that join moments or span episodes are not built (the output format already stores a list of segments).</li>
+  <li>Up to 12 candidates per episode reach de-duplication; at most 3 promos per episode survive; two clips "overlap" when the shared time is at least half of the shorter one.</li>
+  <li>The 5 model score weights (hook .25, cliffhanger .25, emotion .20, stand-alone .15, progression .15) and the 70% model / 30% heuristic blend are my judgement, not learned from data.</li>
+</ul>
+
+<h2>3. How it works — what is code, what is AI, where a human stays</h2>
+<table>
+  <tr><th style="width:13%">Code (free, deterministic)</th><td>Parse screenplays → build every valid window (<b>53,182</b> windows in 16 s) → cheap keyword/cadence score → keep best 12 per episode (600) → drop overlaps (<b>60</b>) → cut out each clip's first 3 s and last 5 s as evidence → <b>re-check every timestamp the model returns</b> against those windows → rank.</td></tr>
+  <tr><th>AI (one job)</th><td>For the 60 shortlisted clips only: find the hook and the cliffhanger <i>inside the evidence windows</i>, score hook / cliffhanger / stakes / stand-alone clarity / progression, write one line on why it works, list risks. JSON is schema-validated; an out-of-window or missing timestamp is never trusted, it downgrades the clip to PARTIAL/FAIL.</td></tr>
+  <tr><th>Human</th><td>Review app (approve / reject / notes, backup + import), and an 18-clip check sheet that turns "looks good" into an accuracy number.</td></tr>
+</table>
+<p><b>Re-runnable:</b> <code>python run_all.py --input &lt;folder&gt;</code> runs all 8 steps (<code>--no-llm</code> works with no API key). <b>Model is swappable</b> by environment variable (Gemini, any OpenAI-compatible API, Anthropic); a test runs the whole evaluator against a fake non-Gemini server.</p>
+
+<h2>4. Result on the 50-episode pack</h2>
+<p>53,182 windows → 600 → <b>60 promos covering all 50 episodes</b>; timestamp check 46 PASS / 14 PARTIAL / 0 FAIL. Ranked first: Ep 32 (107.0–150.8 s: <i>"And what is wrong with that?!"</i> → <i>"…let's see how brave you are when it touches your skin!"</i>), Ep 24 (33.8–89.8 s), Ep 45 (42.0–88.2 s). Every promo carries <i>why it works</i> and <i>why ranked here</i> (score breakdown, timestamp status, main risk) in <code>promos_submission.md/.csv/.json</code>.</p>
+
+<h2>5. Scale and cost</h2>
+<p>The expensive judgement is spent on ~0.1% of windows: a whole 50-episode show is <b>12 requests, about 68k input + 13k output tokens</b>, so the free tier was enough, and cost grows with the shortlist, not episode length. For many shows: one run per show (16 s of CPU), results cached by clip id (resumable), and a stronger model can re-judge only each show's top ~20. Paid API use I would add: a pairwise "which would you post first?" pass on those top 20.</p>
+
+<h2>6. How I know it is good — and where it fails (measured: <code>quality_report.md</code>)</h2>
+<div class="cols"><div>
+<ul>
+  <li><b>My first version was wrong.</b> It used fixed 5-second steps: every start/end was a multiple of 5 s (mid-line cuts) and 46% of clips ran 55 s or more. Rebuilt on event boundaries: long clips 18%, mean model score 70.6 → 75.7, no FAIL.</li>
+  <li><b>Little choice:</b> 40 of 50 episodes get only 1 promo (clips from one scene overlap and get pruned).</li>
+  <li><b>14 of 60 are PARTIAL:</b> the model quoted a strong line that is not in the first 3 s / last 5 s (10× cliffhanger, 4× hook).</li>
+</ul></div><div>
+<ul>
+  <li><b>The heuristic barely agrees with the model</b> (correlation 0.08), so its 30% share is mostly noise; it is one setting (<code>LOCAL_WEIGHT</code>) to change once labels exist.</li>
+  <li><b>The model is a lenient judge:</b> 58 of 60 "promising", scores only spread ±7.6, so ranks near each other are not meaningfully different.</li>
+  <li><b>Needs earlier episodes:</b> 12 of 60 list this as a risk; mean stand-alone score falls from 8.2 (early) to 7.6 (late episodes).</li>
+</ul></div></div>
+<p><b>Human check:</b> <span class="fill">[Fill in after checking the 18 clips in <code>human_check_sheet.csv</code> and running <code>score_human_check.py</code>: e.g. "I agreed with the hook on x/18, the cliffhanger on y/18, and would post z of the top 10."]</span> Until that is filled, the numbers above show where the tool is weak, not how often it is right.</p>
+
+<h2>7. AI tools I used — and where they got it wrong</h2>
+<p><b>Claude Code</b> (built and refactored the pipeline, wrote tests), <b>Gemini 3.5 Flash-Lite</b> (the judge inside the pipeline) <span class="fill">[+ any other tools you used]</span>. <b>Where it was wrong:</b> the AI-written docs and my earlier results claimed "beat-aligned windows", but the saved outputs actually came from the 5-second sliding windows. Nothing flagged it; I only noticed when a fresh run shared <b>0 of 74</b> clips with the old one. Fix: regenerate everything, archive the old run, and add tests for the parameters that drifted. Also: Gemini as judge praises almost everything, so I do not rely on its score without the human sheet.</p>
+
+<h2>8. Next</h2>
+<p>Label ~50 clips with an editor and fit the weights; build joined and cross-episode promos; pick shortlists for variety so each episode offers 2–3 options; run the cinematic cues (acting, pacing) through video once available.</p>
+
+</body>
+</html>
