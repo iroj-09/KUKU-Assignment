@@ -99,7 +99,15 @@ The app contains no show data. On the Home page you upload a drama's screenplay 
 
 **Same files, same answer.** Run `python scripts/build_known_results.py` once after a pipeline run. Uploading one of the pack's files again then shows the promos the pipeline found in it (the same ranking as `submission/raw_outputs/`, marked "saved pipeline results" in the upload report); any other file is processed in the browser. That data holds screenplay text, so it is git-ignored and exists only on this machine.
 
-To deploy it, publish `frontend/dist` (`npm run build`) on any static host such as Vercel or Netlify. Build it from a clean clone (e.g. let Vercel build from GitHub) so the saved screenplay-derived results are not included. The deployed app has no `.env`, so open **AI Model** in the app and enter a model name and API key (kept in your browser only); without one it still finds and ranks promos by rules.
+**Deploying (Vercel).** Import the GitHub repo, set the **Root Directory** to `frontend` (build `npm run build`, output `dist`). Build it from the repo, not from this machine, so the saved screenplay-derived results are not included. To let the deployed app use your model by default, add these **Environment Variables** in the Vercel project and redeploy:
+
+| Variable | Example |
+|---|---|
+| `LLM_API_KEY` | your key (stays on the server; the browser never sees it) |
+| `LLM_MODEL` | `gemini-3.5-flash-lite` |
+| `LLM_MAX_CALLS_PER_HOUR` | optional, default 60 per visitor |
+
+The functions in `frontend/api/llm/` read them, so the header shows the model as connected, the model is fixed by the server, prompts are size-capped and each visitor is rate-limited. Anyone with the link can still spend that key's quota within the limit, so use a key with a small quota and rotate it afterwards. Without these variables the app still ranks promos by rules, and a visitor can enter their own model and key under **AI Model**. A plain environment variable on your computer is not enough for the dev server: put the key in `.env` (`python scripts/setup_model.py`).
 
 ## Confidentiality
 

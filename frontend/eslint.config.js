@@ -28,7 +28,7 @@ export default [
     },
   },
   {
-    files: ['vite*.js', 'vite.config.js', 'eslint.config.js', 'tailwind.config.js', 'postcss.config.js'],
+    files: ['vite*.js', 'vite.config.js', 'eslint.config.js', 'tailwind.config.js', 'postcss.config.js', 'api/**/*.js'],
     languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node } },
   },
   {
