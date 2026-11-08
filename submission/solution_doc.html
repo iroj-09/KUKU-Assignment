@@ -4,89 +4,124 @@
 <meta charset="utf-8">
 <title>Kuku AI Generalist Assignment — Problem 1: Find the Promos</title>
 <style>
-  @page { size: A4; margin: 12mm 13mm; }
+  @page { size: A4; margin: 11mm 13mm; }
+  :root { --brand:#7a1030; --soft:#fbf3f6; --line:#e4d5db; --ink:#1d1d1f; --mute:#5b5b62; }
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 9.6pt; line-height: 1.38; color: #1c1c1c; margin: 0; }
-  h1 { font-size: 14.5pt; margin: 0 0 1px; }
-  .sub { color: #555; font-size: 8.4pt; margin-bottom: 5px; }
-  h2 { font-size: 10pt; margin: 8px 0 2px; border-bottom: 1px solid #ddd; padding-bottom: 1px; color: #7a1030; }
-  p { margin: 2px 0; }
-  ul { margin: 2px 0 2px 15px; padding: 0; }
-  li { margin: 1px 0; }
-  table { border-collapse: collapse; width: 100%; margin: 3px 0; font-size: 9pt; }
-  th, td { border: 1px solid #ddd; padding: 2px 5px; text-align: left; vertical-align: top; }
-  th { background: #f5f0f2; }
-  code { font-family: Consolas, monospace; font-size: 8.2pt; background: #f3f3f3; padding: 0 2px; }
-  .head { border-bottom: 2.5px solid #7a1030; padding-bottom: 5px; margin-bottom: 5px; }
-  .head .tag { color: #7a1030; font-size: 8pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-  .head .who { color: #333; font-size: 8.8pt; margin-top: 1px; }
-  table.links th { width: 17%; background: #7a1030; color: #fff; border-color: #7a1030; }
-  table.links td { background: #fbf6f8; }
-  a { color: #7a1030; text-decoration: none; }
-  h2 { page-break-after: avoid; }
-  .cols { display: flex; gap: 12px; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 9.3pt; line-height: 1.38; color: var(--ink); margin: 0; }
+  a { color: var(--brand); text-decoration: none; }
+  code { font-family: Consolas, monospace; font-size: 8.4pt; background: #f2f2f4; padding: 0 2px; border-radius: 2px; }
+  p { margin: 2px 0 3px; }
+  ul { margin: 2px 0 3px 15px; padding: 0; }
+  li { margin: 1.5px 0; }
+
+  .head { border-bottom: 3px solid var(--brand); padding-bottom: 5px; margin-bottom: 6px; }
+  .tag { color: var(--brand); font-size: 7.8pt; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+  h1 { font-size: 16pt; margin: 1px 0 2px; line-height: 1.15; }
+  .who { color: #333; font-size: 8.8pt; }
+
+  table.links { border-collapse: collapse; width: 100%; margin: 5px 0 6px; font-size: 8.8pt; }
+  table.links th { width: 16%; background: var(--brand); color: #fff; text-align: left; padding: 3px 7px; border: 1px solid var(--brand); }
+  table.links td { background: var(--soft); padding: 3px 7px; border: 1px solid var(--line); }
+
+  .kpis { display: flex; gap: 6px; margin: 6px 0 4px; }
+  .kpi { flex: 1; border: 1px solid var(--line); border-top: 3px solid var(--brand); border-radius: 3px; padding: 3px 6px 4px; background: #fff; }
+  .kpi b { display: block; font-size: 14pt; line-height: 1.1; color: var(--brand); }
+  .kpi span { font-size: 7.6pt; color: var(--mute); }
+
+  h2 { font-size: 10.4pt; margin: 9px 0 2px; color: var(--brand); border-bottom: 1px solid var(--line); padding-bottom: 1px; page-break-after: avoid; }
+  h2 i { font-style: normal; background: var(--brand); color: #fff; border-radius: 50%; display: inline-block; width: 15px; height: 15px; line-height: 15px; text-align: center; font-size: 8pt; margin-right: 5px; vertical-align: 1px; }
+
+  .funnel { margin: 4px 0 5px; }
+  .fr { display: flex; align-items: center; margin: 2px 0; font-size: 8.4pt; }
+  .fr .lbl { width: 24%; color: var(--mute); }
+  .fr .bar { height: 14px; background: var(--brand); border-radius: 2px; color: #fff; font-weight: 700; padding: 0 6px; line-height: 14px; font-size: 8pt; white-space: nowrap; }
+  .fr .note { margin-left: 6px; color: var(--mute); white-space: nowrap; }
+
+  table.t { border-collapse: collapse; width: 100%; margin: 3px 0 4px; font-size: 8.8pt; }
+  table.t th, table.t td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; vertical-align: top; }
+  table.t th { background: var(--soft); width: 14%; }
+
+  .cols { display: flex; gap: 14px; }
   .cols > div { flex: 1; }
+  .good { border-left: 3px solid #2e7d52; background: #f2faf5; padding: 3px 7px; margin: 3px 0; }
+  .bad { border-left: 3px solid #b3261e; background: #fdf4f3; padding: 3px 7px; margin: 3px 0; }
 </style>
 </head>
 <body>
 
 <div class="head">
   <div class="tag">Kuku · AI Generalist Assignment · Problem 1</div>
-  <h1>Find the Promos — screenplay in, ranked promo list out</h1>
+  <h1>Find the Promos: screenplay in, ranked promo list out</h1>
   <div class="who"><b>Praveen Roj</b> · Enrolment No. 23117103 · Mechanical Engineering, IIT Roorkee · praveen_r@me.iitr.ac.in</div>
 </div>
+
 <table class="links">
-  <tr><th>Prototype (live app)</th><td><a href="https://kuku-assignment.vercel.app/">https://kuku-assignment.vercel.app/</a> — upload a screenplay, get ranked promos; connect any model from the “AI Model” button</td></tr>
-  <tr><th>Code</th><td><a href="https://github.com/iroj-09/KUKU-Assignment">https://github.com/iroj-09/KUKU-Assignment</a> — pipeline, review app, tests, README with run steps</td></tr>
-  <tr><th>Output on the pack</th><td><code>ranked_promos.csv</code> (in the submission file): 60 promos, ranked, with every heuristic and model score</td></tr>
+  <tr><th>Prototype</th><td><a href="https://kuku-assignment.vercel.app/">https://kuku-assignment.vercel.app/</a> · upload a screenplay, get ranked promos; connect any model from “AI Model”</td></tr>
+  <tr><th>Code</th><td><a href="https://github.com/iroj-09/KUKU-Assignment">https://github.com/iroj-09/KUKU-Assignment</a> · pipeline, review app, tests, run steps in README</td></tr>
+  <tr><th>Raw outputs</th><td>Drive folder: <code>raw_outputs/</code> (unedited run on all 50 episodes) and <code>ranked_promos.csv</code> (the 60 promos, every score)</td></tr>
 </table>
 
-<h2>1. Why Problem 1, and how I scoped it</h2>
-<p>It is a weekly bottleneck (an editor watches every episode of every new show), it comes with real data (50 episodes), and its output is checkable: an episode, start/end times, a hook, a cliffhanger. I scoped it to <b>one step of the editor's work: producing a ranked shortlist of candidate promos</b>. The editor still watches and cuts; the tool decides where to look first.</p>
+<p><b>In one line:</b> for each episode the tool finds the 20–60 s stretches an editor would most want to look at first, says <i>why</i> (hook, cliffhanger), and proves every timestamp it quotes. It shortlists; the editor still watches and cuts.</p>
 
-<h2>2. Assumptions (the brief was silent)</h2>
+<div class="kpis">
+  <div class="kpi"><b>50</b><span>episodes in the pack</span></div>
+  <div class="kpi"><b>53,182</b><span>windows built in 16 s</span></div>
+  <div class="kpi"><b>60</b><span>promos, all 50 episodes covered</span></div>
+  <div class="kpi"><b>12</b><span>model requests for the whole show</span></div>
+  <div class="kpi"><b>46 / 14 / 0</b><span>timestamp PASS / PARTIAL / FAIL</span></div>
+</div>
+
+<h2><i>1</i>Why Problem 1, and how I scoped it</h2>
+<p>It is a weekly bottleneck (someone watches every episode of every new show), it comes with real data (50 episodes), and the output is checkable: an episode, start/end times, a hook and a cliffhanger I can verify against the text. I scoped it to <b>one step of the editor's work: a ranked shortlist of candidate promos</b>. Deciding where to look first is automated; watching and cutting stays human.</p>
+
+<h2><i>2</i>Assumptions (the brief was silent)</h2>
 <ul>
-  <li>The screenplay timestamps are my only evidence. "First 3 s / last 5 s" are measured in screenplay seconds; I cannot see acting, visuals or music.</li>
-  <li>A promo is <b>one continuous 20–60 s stretch that starts and ends on event boundaries</b>, so no line is cut in half. Promos that join moments or span episodes are not built (the output format already stores a list of segments).</li>
-  <li>Up to 12 candidates per episode reach de-duplication; at most 3 promos per episode survive; two clips "overlap" when the shared time is at least half of the shorter one.</li>
-  <li>The 5 model score weights (hook .25, cliffhanger .25, emotion .20, stand-alone .15, progression .15) and the 70% model / 30% heuristic blend are my judgement, not learned from data.</li>
+  <li>Screenplay timestamps are my only evidence. “First 3 s / last 5 s” are screenplay seconds; I cannot judge acting, visuals or music.</li>
+  <li>A promo is <b>one continuous 20–60 s stretch that starts and ends on event boundaries</b>, so no line is cut in half. Joined or cross-episode promos are not built (the output already stores a list of segments, so they can be added).</li>
+  <li>12 candidates per episode reach de-duplication; at most 3 survive; two clips “overlap” when the shared time is at least half of the shorter one.</li>
+  <li>Model score weights (hook .25, cliffhanger .25, emotion .20, stand-alone .15, progression .15) and the 70% model / 30% heuristic blend are my judgement, not learned from data.</li>
 </ul>
 
-<h2>3. How it works — what is code, what is AI, where a human stays</h2>
-<table>
-  <tr><th style="width:13%">Code (free, deterministic)</th><td>Parse screenplays → build every valid window (<b>53,182</b> windows in 16 s) → cheap keyword/cadence score → keep best 12 per episode (600) → drop overlaps (<b>60</b>) → cut out each clip's first 3 s and last 5 s as evidence → <b>re-check every timestamp the model returns</b> against those windows → rank.</td></tr>
-  <tr><th>AI (one job)</th><td>For the 60 shortlisted clips only: find the hook and the cliffhanger <i>inside the evidence windows</i>, score hook / cliffhanger / stakes / stand-alone clarity / progression, write one line on why it works, list risks. JSON is schema-validated; an out-of-window or missing timestamp is never trusted, it downgrades the clip to PARTIAL/FAIL.</td></tr>
-  <tr><th>Human</th><td>Review app (approve / reject / notes, backup + import); every shortlisted clip is a candidate for a person to approve or reject.</td></tr>
+<h2><i>3</i>How it works: code, AI, human</h2>
+<div class="funnel">
+  <div class="fr"><div class="lbl">All valid windows</div><div class="bar" style="width:58%">53,182</div><div class="note">free code, 16 s</div></div>
+  <div class="fr"><div class="lbl">Best 12 per episode</div><div class="bar" style="width:22%">600</div><div class="note">cheap keyword / pacing score</div></div>
+  <div class="fr"><div class="lbl">After overlap removal</div><div class="bar" style="width:12%">60</div><div class="note">the only clips the AI sees</div></div>
+</div>
+<table class="t">
+  <tr><th>Code</th><td>Parse → build every valid window → cheap score → keep best 12 per episode → drop overlaps → cut each clip's first 3 s and last 5 s as evidence → <b>re-check every timestamp the model returns</b> against those windows → rank. Deterministic and free.</td></tr>
+  <tr><th>AI (one job)</th><td>For the 60 shortlisted clips only: find the hook and cliffhanger <i>inside the evidence windows</i>, score hook / cliffhanger / emotion / stand-alone clarity / progression, write one line on why it works, list risks. Output is schema-validated; an out-of-window or missing timestamp is never trusted and downgrades the clip to PARTIAL/FAIL.</td></tr>
+  <tr><th>Human</th><td>Review page in the app: approve / reject / notes per clip, backup and import. Every shortlisted clip is a candidate for a person to confirm.</td></tr>
 </table>
-<p><b>Re-runnable:</b> <code>python run_all.py --input &lt;folder&gt;</code> runs all 8 steps (<code>--no-llm</code> works with no API key). <b>Model is swappable</b> by environment variable (Gemini, any OpenAI-compatible API, Anthropic); a test runs the whole evaluator against a fake non-Gemini server.</p>
+<p><b>Re-runnable:</b> <code>python run_all.py --input &lt;folder&gt;</code> (8 steps; <code>--no-llm</code> works without a key). <b>Model is swappable</b> with environment variables (Gemini, any OpenAI-compatible API, Anthropic); a test runs the whole evaluator against a fake non-Gemini server. The live app keeps the API key on the server and shows no screenplay data (confidential); a new upload uses a lightweight in-browser heuristic (3 clips per script) plus the optional AI pass.</p>
 
-<h2>4. Result on the 50-episode pack</h2>
-<p>53,182 windows → 600 → <b>60 promos covering all 50 episodes</b>; timestamp check 46 PASS / 14 PARTIAL / 0 FAIL. Ranked first: Ep 32 (107.0–150.8 s: <i>"And what is wrong with that?!"</i> → <i>"…let's see how brave you are when it touches your skin!"</i>), Ep 24 (33.8–89.8 s), Ep 45 (42.0–88.2 s). Every promo carries <i>why it works</i> and <i>why ranked here</i> (score breakdown, timestamp status, main risk) in <code>ranked_promos.csv</code>.</p>
+<h2><i>4</i>Result on the 50-episode pack</h2>
+<p><b>60 promos covering all 50 episodes.</b> Top ranked: Ep 32 (107.0–150.8 s: <i>“And what is wrong with that?!”</i> → <i>“…let's see how brave you are when it touches your skin!”</i>), Ep 24 (33.8–89.8 s), Ep 45 (42.0–88.2 s). Each promo carries <i>why it works</i> and <i>why ranked here</i> (score breakdown, timestamp status, main risk) in <code>ranked_promos.csv</code>.</p>
 
-<p><b>About the live app:</b> it ships no screenplay data (confidential), so for a new upload it runs a lightweight in-browser heuristic (3 clips per script by default) and the optional AI pass. The full pipeline result for the input pack (60 promos with heuristic and model scores) is <code>ranked_promos.csv</code>.</p>
+<h2><i>5</i>Scale and cost: every show we make</h2>
+<p>The expensive judgement is spent on about 0.1% of windows. A whole 50-episode show took <b>12 requests, about 68k input + 13k output tokens</b>, so the free tier was enough, and cost grows with the shortlist, not with episode length. For many shows: one run per show (16 s of CPU), results cached by clip id (resumable), and a stronger model can re-judge only each show's top ~20. With paid API budget I would add a pairwise “which would you post first?” pass on those 20.</p>
 
-<h2>5. Scale and cost</h2>
-<p>The expensive judgement is spent on ~0.1% of windows: a whole 50-episode show is <b>12 requests, about 68k input + 13k output tokens</b>, so the free tier was enough, and cost grows with the shortlist, not episode length. For many shows: one run per show (16 s of CPU), results cached by clip id (resumable), and a stronger model can re-judge only each show's top ~20. Paid API use I would add: a pairwise "which would you post first?" pass on those top 20.</p>
+<h2><i>6</i>How I know it is good, and where it fails</h2>
+<p>Measured by <code>quality_report.md</code> on the real run, not hand-picked examples. These numbers come from the pipeline itself (no manual accuracy check), so they show where the tool is weak, not how often it is right.</p>
+<div class="cols">
+<div>
+  <div class="good"><b>Caught my own wrong first version.</b> Fixed 5 s steps gave mid-line cuts and 46% of clips ≥55 s. Rebuilt on event boundaries: long clips 18%, mean model score 70.6 → 75.7, no FAIL.</div>
+  <div class="good"><b>Timestamps are verified, not trusted:</b> 46 PASS, 14 PARTIAL, 0 FAIL.</div>
+  <div class="bad"><b>14 of 60 are PARTIAL:</b> the model quoted a strong line outside the first 3 s / last 5 s (10× cliffhanger, 4× hook).</div>
+  <div class="bad"><b>Little choice:</b> 40 of 50 episodes get only 1 promo (clips from one scene overlap and are pruned).</div>
+</div>
+<div>
+  <div class="bad"><b>Heuristic barely agrees with the model</b> (correlation 0.08), so its 30% share is mostly noise. It is one setting (<code>LOCAL_WEIGHT</code>) to change once labels exist.</div>
+  <div class="bad"><b>The model is a lenient judge:</b> 58 of 60 “promising”, scores spread only ±7.6, so neighbouring ranks are not meaningfully different.</div>
+  <div class="bad"><b>Needs earlier episodes:</b> 12 of 60 list this as a risk; mean stand-alone score falls from 8.2 (early) to 7.6 (late).</div>
+</div>
+</div>
 
-<h2>6. How I know it is good — and where it fails (measured: <code>quality_report.md</code>)</h2>
-<div class="cols"><div>
-<ul>
-  <li><b>My first version was wrong.</b> It used fixed 5-second steps: every start/end was a multiple of 5 s (mid-line cuts) and 46% of clips ran 55 s or more. Rebuilt on event boundaries: long clips 18%, mean model score 70.6 → 75.7, no FAIL.</li>
-  <li><b>Little choice:</b> 40 of 50 episodes get only 1 promo (clips from one scene overlap and get pruned).</li>
-  <li><b>14 of 60 are PARTIAL:</b> the model quoted a strong line that is not in the first 3 s / last 5 s (10× cliffhanger, 4× hook).</li>
-</ul></div><div>
-<ul>
-  <li><b>The heuristic barely agrees with the model</b> (correlation 0.08), so its 30% share is mostly noise; it is one setting (<code>LOCAL_WEIGHT</code>) to change once labels exist.</li>
-  <li><b>The model is a lenient judge:</b> 58 of 60 "promising", scores only spread ±7.6, so ranks near each other are not meaningfully different.</li>
-  <li><b>Needs earlier episodes:</b> 12 of 60 list this as a risk; mean stand-alone score falls from 8.2 (early) to 7.6 (late episodes).</li>
-</ul></div></div>
-<p><b>Note:</b> the numbers above come from the pipeline itself (not from a manual accuracy check), so they show where the tool is weak, not how often it is right.</p>
+<h2><i>7</i>AI tools I used, and where they got it wrong</h2>
+<p><b>Claude Code</b> (built and refactored the pipeline, wrote tests) and <b>Gemini 3.5 Flash-Lite</b> (the judge inside the pipeline). <b>Where it was wrong:</b> AI-written docs and my earlier results claimed “beat-aligned windows”, but the saved outputs came from 5-second sliding windows. Nothing flagged it; I noticed only when a fresh run shared <b>0 of 74</b> clips with the old one. Fix: regenerate everything, archive the old run, add tests for the parameters that drifted.</p>
 
-<h2>7. AI tools I used — and where they got it wrong</h2>
-<p><b>Claude Code</b> (built and refactored the pipeline, wrote tests), <b>Gemini 3.5 Flash-Lite</b> (the judge inside the pipeline). <b>Where it was wrong:</b> the AI-written docs and my earlier results claimed "beat-aligned windows", but the saved outputs actually came from the 5-second sliding windows. Nothing flagged it; I only noticed when a fresh run shared <b>0 of 74</b> clips with the old one. Fix: regenerate everything, archive the old run, and add tests for the parameters that drifted. Also: Gemini as judge praises almost everything, so its score is one input to the ranking, not the final word.</p>
-
-<h2>8. Next</h2>
-<p>Label ~50 clips with an editor and fit the weights; build joined and cross-episode promos; pick shortlists for variety so each episode offers 2–3 options; run the cinematic cues (acting, pacing) through video once available.</p>
+<h2><i>8</i>Next</h2>
+<p>Label ~50 clips with an editor and fit the weights; build joined and cross-episode promos; choose shortlists for variety so each episode offers 2–3 options; add video cues (acting, pacing) once available.</p>
 
 </body>
 </html>
