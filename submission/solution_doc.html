@@ -72,7 +72,19 @@
 </div>
 
 <h2><i>1</i>Why Problem 1, and how I scoped it</h2>
-<p>It is a weekly bottleneck (someone watches every episode of every new show), it comes with real data (50 episodes), and the output is checkable: an episode, start/end times, a hook and a cliffhanger I can verify against the text. I scoped it to <b>one step of the editor's work: a ranked shortlist of candidate promos</b>. Deciding where to look first is automated; watching and cutting stays human.</p>
+<p><b>Why this one.</b></p>
+<ul>
+  <li><b>Real, repeating pain.</b> Every new show means an editor reading or watching every episode just to find the 30–60 seconds worth promoting. That is likely hours per show (my estimate, not a Kuku figure), and it grows with every show Kuku makes, so a small saving per episode compounds.</li>
+  <li><b>Real data to test on.</b> The pack has 50 full episodes, so I could run the whole thing end to end, see it fail, and fix it. For the other problems I would have had to invent my own test cases.</li>
+  <li><b>An answer I can check.</b> A promo is an episode, a start and end time, a hook and a cliffhanger. Every one of those can be verified against the screenplay text, so “is it good?” is something I can measure instead of argue.</li>
+  <li><b>A natural split between AI and code.</b> Reading 53,000 windows is a job for cheap rules; judging whether a line is a real hook is a job for a language model on a handful of clips. That split is the cost story at scale.</li>
+</ul>
+<p><b>How I scoped it.</b> I treated the task as <b>“where should the editor look first?”</b>, not “make the promo”. The tool returns a ranked shortlist with timestamps and a reason for each pick; the editor watches, trims and decides.</p>
+<ul>
+  <li><b>In:</b> screenplay text in, per-episode candidates out, each with hook, cliffhanger, reason, risks and a verified timestamp; a review page and a re-runnable pipeline; a model that can be swapped.</li>
+  <li><b>Out, on purpose:</b> video or audio analysis, editing the clip, stitching moments from different scenes or episodes, and learning from editor feedback (no labels yet). I list these under “Next” rather than half-build them.</li>
+  <li><b>Done means:</b> it runs on all 50 episodes without hand fixing, every promo is 20–60 s, every quoted timestamp is checked, and the weak spots are measured and reported.</li>
+</ul>
 
 <h2><i>2</i>Assumptions (the brief was silent)</h2>
 <ul>
