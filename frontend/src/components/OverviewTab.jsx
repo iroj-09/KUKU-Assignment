@@ -25,7 +25,7 @@ export default function OverviewTab({ candidates, onSelectCandidate, setActiveTa
           </button>
         }
       >
-        There are no promos in this view. Upload screenplay files, or restore the saved results.
+        There are no promos in this view. Upload screenplay files to get started.
       </EmptyState>
     );
   }
@@ -101,7 +101,7 @@ export default function OverviewTab({ candidates, onSelectCandidate, setActiveTa
             <span>Average Gemini Score</span>
             <TrendingUp className="w-3.5 h-3.5 text-amber-500" />
           </div>
-          <div className="text-2xl font-extrabold text-amber-600">{avgGemini} <span className="text-xs font-normal text-slate-500">/ 100</span></div>
+          <div className="text-2xl font-extrabold text-amber-600">{avgGemini}{judged.length > 0 && <span className="text-xs font-normal text-slate-500"> / 100</span>}</div>
           <div className="text-[11px] text-slate-500 mt-1">
             {judged.length === candidates.length ? 'Editorial rubric evaluation' : `Judged by the model: ${judged.length} of ${candidates.length}`}
           </div>
@@ -113,7 +113,7 @@ export default function OverviewTab({ candidates, onSelectCandidate, setActiveTa
             <Flame className="w-3.5 h-3.5 text-rose-500" />
           </div>
           <div className="text-2xl font-extrabold text-emerald-600">{promisingCount} <span className="text-xs font-normal text-slate-500">/ {candidates.length}</span></div>
-          <div className="text-[11px] text-slate-500 mt-1">{((promisingCount / candidates.length) * 100).toFixed(1)}% AI recommendation rate</div>
+          <div className="text-[11px] text-slate-500 mt-1">{((promisingCount / candidates.length) * 100).toFixed(1)}% {judged.length === candidates.length ? 'AI recommendation rate' : 'flagged promising'}</div>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs">
@@ -121,7 +121,7 @@ export default function OverviewTab({ candidates, onSelectCandidate, setActiveTa
             <span>Timestamp Compliance</span>
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
           </div>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
             <span className="text-xs font-bold text-emerald-700">{passCount} PASS</span>
             <span className="text-xs text-amber-700 font-semibold">{partialCount} PARTIAL</span>
             <span className="text-xs text-rose-700 font-semibold">{failCount} FAIL</span>

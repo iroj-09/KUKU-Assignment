@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { unquote } from '../utils/text';
 import { ArrowLeft, Upload, X, FileText, CheckCircle2, Sparkles, ArrowRight } from 'lucide-react';
 import { parseFile, generateCandidatesFromScript } from '../utils/clientParser';
+import { savedResultsFor } from '../utils/knownResults';
+import { byScoreThenRank } from '../utils/ranking';
 import { evaluateCandidateWithGemini, isModelConfigured } from '../utils/geminiEvaluator';
 
 // One line per uploaded file: how many promos it gave, or why it gave none.
@@ -13,7 +15,7 @@ function FileReport({ report, minDur }) {
   };
   const label = (r) =>
     r.status === 'ok'
-      ? `${r.count} promo${r.count === 1 ? '' : 's'}`
+      ? `${r.count} promo${r.count === 1 ? '' : 's'}${r.saved ? ' · saved pipeline results' : ''}`
       : r.status === 'empty'
         ? `No promo windows (needs timestamped scenes of at least ${minDur}s)`
         : `Could not read: ${r.message}`;
@@ -98,13 +100,20 @@ export default function UploadModal({ isOpen, onClose, onPromosGenerated, asPage
       await new Promise((r) => setTimeout(r, 60));
 
       try {
-        const text = await file.text();
-        const parsed = parseFile(text, file.name);
-        const candidates = generateCandidatesFromScript(parsed, minDur, maxDur, maxPerScript);
+        // A file this project already analysed shows the saved pipeline results (the submitted raw outputs).
+        const saved = await savedResultsFor(file);
+        let candidates;
+        if (saved) {
+          candidates = saved.map((c) => ({ ...c }));
+        } else {
+          const text = await file.text();
+          const parsed = parseFile(text, file.name);
+          candidates = generateCandidatesFromScript(parsed, minDur, maxDur, maxPerScript);
+        }
         // Tag each clip with its source file so it can be removed per-file later.
-        // Uploaded clips get their own ids, so reviews saved for the pipeline drama never show up on them.
+        // Each clip's id includes its file name, so the same episode number in two files stays two clips.
         allGenerated.push(...candidates.map((c) => ({ ...c, id: `upload:${file.name}|${c.id}`, sourceFile: file.name })));
-        report.push({ name: file.name, status: candidates.length ? 'ok' : 'empty', count: candidates.length });
+        report.push({ name: file.name, status: candidates.length ? 'ok' : 'empty', count: candidates.length, saved: Boolean(saved) });
       } catch (err) {
         console.error(`Error processing ${file.name}:`, err);
         report.push({ name: file.name, status: 'error', message: err.message || 'unknown error' });
@@ -121,21 +130,21 @@ export default function UploadModal({ isOpen, onClose, onPromosGenerated, asPage
     }
 
     // Rank by local score first so "top 3" really means the best three across all files.
-    allGenerated.sort((a, b) => b.hybridScore - a.hybridScore);
+    allGenerated.sort(byScoreThenRank);
 
     // Step 2: Optional Gemini Evaluation (Only if user toggled it ON)
     if (useGeminiAuto) {
       if (!isModelConfigured()) {
         alert('No AI model is connected, so these promos use local scoring. Click "AI Model" in the top bar to connect one.');
       } else {
-        const topToEvaluate = allGenerated.slice(0, 3);
+        const topToEvaluate = allGenerated.filter((c) => c.geminiScore == null).slice(0, 3);
         let geminiFailures = 0;
         let geminiFatal = null;
         for (let j = 0; j < topToEvaluate.length; j++) {
           setProgressMsg(`AI Evaluating candidate ${j + 1} of ${topToEvaluate.length}...`);
           try {
             const updated = await evaluateCandidateWithGemini(topToEvaluate[j]);
-            allGenerated[j] = updated;
+            allGenerated[allGenerated.indexOf(topToEvaluate[j])] = updated;
           } catch (gemErr) {
             console.warn('Gemini eval warning:', gemErr);
             geminiFailures += 1;
@@ -160,7 +169,7 @@ export default function UploadModal({ isOpen, onClose, onPromosGenerated, asPage
     setProgressMsg('');
 
     // Sort by hybrid score
-    allGenerated.sort((a, b) => b.hybridScore - a.hybridScore);
+    allGenerated.sort(byScoreThenRank);
     setGeneratedResults(allGenerated);
   };
 

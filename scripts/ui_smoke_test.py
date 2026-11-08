@@ -1,16 +1,18 @@
-"""Browser smoke test of the React review app (real Chrome, every tab and the main flows).
+"""Browser smoke test of the React app (real Chrome, every page and the main flows).
+
+The app ships with no show data, so the test uploads the first 5 episodes of the pack in data/input
+(Upload & Generate) and works on those clips.
 
 Needs (optional, not in requirements.txt):   pip install playwright    and Google Chrome installed.
-Needs the 50-episode pack in data/input and a built app with the sample data:
 
-    python scripts/sync_frontend_data.py
     cd frontend && npm run build && npx vite preview --port 4180 &
     python scripts/ui_smoke_test.py            # BASE_URL env var overrides http://localhost:4180/
 
-Checks: data loads, all tabs open, Explorer counts, Simulator plays and resets, Compare shows model scores,
-Review save/backup/import, Export downloads, Upload add/remove/generate/restore, batch-AI abort on a bad key
-and cancel (the Gemini API is mocked), and no horizontal overflow on a phone-width screen.
-Exit code 1 if any check fails; failing screenshots go to the temp folder printed at the end.
+Checks: Home offers only Upload & Generate, uploads work (add/remove files, per-file report, failures
+explained), uploads survive a refresh, every page opens, Explorer filters/keyboard/copy buttons,
+Simulator plays and resets, Compare, Review (shortcuts, backup/import), Export downloads, batch-AI abort
+on a bad key and cancel (the Gemini API is mocked), the AI Model dialog, and no horizontal overflow on a
+phone-width screen. Exit code 1 if any check fails; failing screenshots go to the temp folder printed.
 """
 import json
 import os
@@ -25,11 +27,26 @@ from playwright.sync_api import sync_playwright
 BASE = os.environ.get("BASE_URL", "http://localhost:4180/")
 ROOT = Path(__file__).resolve().parent.parent
 SCRATCH = Path(tempfile.mkdtemp(prefix="kuku_ui_test_"))
-EP1 = ROOT / "data" / "input" / "episode-001-Episode 1671703.txt"
-EP2 = ROOT / "data" / "input" / "episode-002-Episode 1671704.txt"
+PACK = sorted((ROOT / "data" / "input").glob("episode-*.txt"))
+KNOWN = ROOT / "frontend" / "src" / "data" / "known_results.json"   # saved pipeline results (local only)
+
+
+def variant(f):
+    """The same screenplay plus a trailing blank line: a different file fingerprint, so the app processes it in
+    the browser instead of showing the saved pipeline results."""
+    d = SCRATCH / "variants"
+    d.mkdir(exist_ok=True)
+    out = d / f.name
+    out.write_bytes(f.read_bytes() + b"\n\n")
+    return out
+
+
+FIX = [variant(f) for f in PACK[:5]]    # the "drama" most steps upload
+EP1, EP2 = FIX[0], FIX[1]
 
 results = []
 console_errors = []
+S = {}                  # shared facts, e.g. how many clips the fixture upload produced
 
 
 def step(name):
@@ -54,14 +71,49 @@ def expect(cond, msg="assertion failed"):
 
 
 def tab(label):
-    # Page tabs exist only once a drama is open; from Home, open the saved drama first.
+    # Page tabs exist only once clips are showing; from Home, continue with the uploads first.
     btn = page.get_by_role("button", name=re.compile(label)).first
     if not btn.is_visible():
-        page.get_by_role("button", name="Open existing results").click()
+        page.get_by_role("button", name="Continue with my uploads").click()
         page.wait_for_timeout(300)
         btn = page.get_by_role("button", name=re.compile(label)).first
     btn.click()
     page.wait_for_timeout(300)
+
+
+def wipe():
+    """Forget saved uploads, reviews and settings, like a first visit."""
+    # Clear from a blank same-origin page: with the app running it would write its clips back.
+    page.route("**/__blank__", lambda r: r.fulfill(status=200, content_type="text/plain", body="blank"))
+    page.goto(BASE + "__blank__")
+    page.evaluate("localStorage.clear()")
+    page.evaluate(
+        "new Promise((resolve) => { const open = indexedDB.open('kuku_promo_studio', 1);"
+        " open.onupgradeneeded = () => open.result.createObjectStore('kv');"
+        " open.onerror = () => resolve();"
+        " open.onsuccess = () => { const db = open.result; const tx = db.transaction('kv', 'readwrite');"
+        " tx.objectStore('kv').clear(); tx.oncomplete = tx.onerror = tx.onabort = () => { db.close(); resolve(); }; }; })"
+    )
+    page.unroute("**/__blank__")
+    page.goto(BASE)
+    page.wait_for_selector("text=Find the promos worth posting", timeout=15000)
+
+
+def upload(files, explore=True):
+    page.goto(BASE + "#/upload")
+    page.wait_for_selector("text=Upload & Generate Promo Clips")
+    page.locator("input[type=file][accept*='.txt']").set_input_files([str(f) for f in files])
+    page.get_by_role("button", name=re.compile("Generate Beat-Aligned")).click()
+    page.wait_for_selector("text=Promo Discovery Complete", timeout=60000)
+    if explore:
+        page.get_by_role("button", name=re.compile("Explore Generated Promos")).click()
+        page.wait_for_selector("text=Candidate Leaderboard", timeout=15000)
+
+
+def fixture():
+    wipe()
+    upload(FIX)
+    S["n"] = int(re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1))
 
 
 with sync_playwright() as p:
@@ -75,48 +127,39 @@ with sync_playwright() as p:
     page.on("console", lambda m: console_errors.append(m.text) if m.type == "error" else None)
     page.on("pageerror", lambda e: console_errors.append("PAGEERROR " + str(e)))
 
-    @step("1 app loads with pipeline data")
+    @step("1 first visit: Home offers only Upload & Generate, no tabs, no drama numbers")
     def _():
-        page.goto(BASE)
-        page.wait_for_selector("text=KUKU PROMO STUDIO", timeout=15000)
-        page.wait_for_selector("text=Find the promos worth posting", timeout=15000)
-        # Home: nothing chosen yet, so the header carries no drama numbers
-        expect("Episodes:" not in page.inner_text("header"), "Home header should not show drama stats")
-        # ...they appear on the drama's own pages
-        tab("Overview")
-        page.wait_for_selector("text=Broken Soldier >> visible=true")
-        txt = page.inner_text("header")
-        expect(re.search(r"Episodes:\s*50", txt) and "60 clips" in txt, "header stats on Overview: " + txt[:200])
-        tab("Home")  # the next step starts from Home
-        page.wait_for_selector("text=Find the promos worth posting")
-
-    @step("1b home: two options, each opens its own page")
-    def _():
+        wipe()
         body = page.inner_text("body")
-        expect("I Married a Broken Soldier. He was a Duke." in body, "drama name is the title of option 1")
-        expect("Upload a new drama" in body and "Explore existing results" not in body, "option 2 + no generic title")
-        card = page.get_by_role("button", name="Open existing results")
-        expect(card.is_enabled(), "existing-results card enabled")
-        expect("60" in card.inner_text() and "50" in card.inner_text(), "card shows the real stats")
-        card.click()
-        page.wait_for_selector("text=Broken Soldier >> visible=true", timeout=5000)          # Overview page
-        tab("Home")
+        expect(page.get_by_role("button", name="Upload and generate").count() == 1, "one upload card")
+        expect("Open existing results" not in body and "already analysed" not in body.lower(), "no saved-drama option")
+        expect(page.locator("header nav").count() == 0, "no page tabs before there are clips")
+        expect("Episodes:" not in page.inner_text("header"), "no drama numbers on Home")
+        expect("Continue with my uploads" not in body, "nothing to continue yet")
         page.get_by_role("button", name="Upload and generate").click()
-        page.wait_for_selector("text=Upload & Generate Promo Clips", timeout=5000)  # upload page
+        page.wait_for_selector("text=Upload & Generate Promo Clips", timeout=5000)
         expect(page.locator(".fixed.inset-0").count() == 0, "upload is a page, not a floating dialog")
         page.get_by_role("button", name=re.compile("Back")).click()
         page.wait_for_selector("text=Find the promos worth posting", timeout=5000)
+
+    @step("1b upload 5 episodes: clips appear, header shows this drama's numbers")
+    def _():
+        fixture()
+        expect(S["n"] >= 12, f"enough clips to test with, got {S['n']}")
+        txt = page.inner_text("header")
+        expect(re.search(r"Episodes:\s*5", txt) and f"{S['n']} clips" in txt and "Your uploads" in txt, "header: " + txt[:240])
+        expect(page.locator("header nav").count() == 1, "tabs appear once clips are showing")
 
     @step("2 every tab opens")
     def _():
         for label, marker in [
             ("Home", "Find the promos worth posting"),
-            ("Promo Explorer", "Candidate Leaderboard (60)"),
+            ("Promo Explorer", f"Candidate Leaderboard ({S['n']})"),
             ("Phone Simulator", "Previewing Vertical Promo"),
             ("Compare Battle", "Promo Comparison Battle"),
             ("Editorial Review", "Human Editorial Sign-Off"),
             ("Export NLE", "Export & NLE Delivery Station"),
-            ("Overview", "Broken Soldier"),
+            ("Overview", "Your uploaded scripts"),
         ]:
             tab(label)
             page.wait_for_selector(f"text={marker} >> visible=true", timeout=5000)
@@ -125,10 +168,9 @@ with sync_playwright() as p:
     def _():
         tab("Promo Explorer")
         opts = page.locator("select option").all_inner_texts()
-        expect(any("PASS Only (46)" in o for o in opts), str(opts[:12]))
-        expect(any("PARTIAL (14)" in o for o in opts), "PARTIAL count")
-        expect(any("All 50 Episodes" in o for o in opts), "episode count option")
-        expect(any("UNVERIFIED (0)" in o for o in opts), "UNVERIFIED option")
+        expect(any(f"UNVERIFIED ({S['n']})" in o for o in opts), str(opts[:12]))
+        expect(any("All 5 Episodes" in o for o in opts), "episode count option")
+        expect(any("PASS Only (0)" in o for o in opts), "PASS count option")
 
     @step("4 simulator: plays, advances, resets when clip changes")
     def _():
@@ -179,17 +221,20 @@ with sync_playwright() as p:
         t2, _ = clock()
         expect(0.2 < t2 < 3.0, f"replay should restart near 0, got {t2}")
 
-    @step("5 compare: shows model dimension scores, not heuristic ones")
+    @step("5 compare: clips no model has judged say so, not a made-up model score")
     def _():
         tab("Compare Battle")
         page.wait_for_selector("text=Promo Comparison Battle")
         body = page.inner_text("body")
-        nums = [float(x) for x in re.findall(r"Hook Impact:\s*\n?\s*([0-9.]+)\s*/ 10", body)]
-        expect(nums and min(nums) >= 5, f"hook scores should be the model's (>=5 typically), got {nums}")
+        expect("not judged" in body, "model score shows 'not judged' for uploaded clips")
+        expect("NaN" not in body and "undefined" not in body, "no NaN/undefined")
 
     @step("6 review: save decision, backup JSON, wipe, import")
     def _():
         tab("Editorial Review")
+        page.evaluate("localStorage.removeItem('kuku_human_reviews')")
+        page.reload()
+        page.wait_for_selector("text=Human Editorial Sign-Off")
         page.get_by_role("radio", name=re.compile("Approve for Edit")).click()
         page.get_by_role("button", name=re.compile("Save Review Decision")).click()
         page.wait_for_selector("text=1 Approved")
@@ -229,10 +274,11 @@ with sync_playwright() as p:
         txt = f.read_text(encoding="utf-8")
         expect("FCM: NON-DROP FRAME" in txt and "001  AX" in txt, "edl structure")
 
-    @step("8 upload: add 2 files, remove one, generate -> only uploaded shown, chips removable")
+    @step("8 upload: add 2 files, remove one, generate; chips removable; removing all returns to Upload")
     def _():
-        tab("Overview")
-        page.get_by_role("button", name=re.compile("Upload & Generate")).first.click()
+        wipe()
+        page.goto(BASE + "#/upload")
+        page.wait_for_selector("text=Upload & Generate Promo Clips")
         fi = page.locator("input[type=file][accept*='.txt']")
         fi.set_input_files([str(EP1), str(EP2)])
         page.wait_for_selector("text=Selected Files (2)")
@@ -243,56 +289,29 @@ with sync_playwright() as p:
         page.get_by_role("button", name=re.compile("Generate Beat-Aligned")).click()
         page.wait_for_selector("text=Promo Discovery Complete", timeout=30000)
         page.get_by_role("button", name=re.compile("Explore Generated Promos")).click()
-        page.wait_for_selector("text=Showing only your uploads", timeout=5000)
+        page.wait_for_selector("text=Promos from your uploads", timeout=5000)
         banner = page.inner_text("body")
         expect("episode-001" in banner and "episode-002" in banner, "both file chips")
         expect(re.search(r"Episodes:\s*2", page.inner_text("header")), "header shows 2 episodes")
         page.wait_for_selector("text=Candidate Leaderboard", timeout=10000)  # Explorer is lazy-loaded
-        board = page.inner_text("body")
-        expect("Episode 32" not in board.split("Candidate Leaderboard")[1][:3000], "pipeline clips must not be listed")
-        expect("UNVERIFIED" in board, "uploaded clips are UNVERIFIED")
+        expect("UNVERIFIED" in page.inner_text("body"), "uploaded clips are UNVERIFIED")
         # remove one uploaded file
         page.get_by_label(re.compile("Remove episode-001")).click()
         page.wait_for_timeout(300)
-        expect("episode-001" not in page.inner_text("body").split("Showing only your uploads")[1][:400], "chip removed")
-        # remove the last one -> back to pipeline results
+        expect("episode-001" not in page.inner_text("body").split("Promos from your uploads")[1][:400], "chip removed")
+        # remove the last one -> nothing left, back to the upload page
         page.get_by_label(re.compile("Remove episode-002")).click()
-        page.wait_for_selector("text=60 clips", timeout=5000)
-        expect("Showing only your uploads" not in page.inner_text("body"), "banner gone")
+        page.wait_for_selector("text=Upload & Generate Promo Clips", timeout=5000)
+        fixture()
 
-    @step("9 upload view: restore button returns pipeline results")
+    @step("9 home after an upload: continue banner brings the clips back")
     def _():
-        tab("Overview")
-        page.get_by_role("button", name=re.compile("Upload & Generate")).first.click()
-        page.locator("input[type=file][accept*='.txt']").set_input_files([str(EP1)])
-        page.get_by_role("button", name=re.compile("Generate Beat-Aligned")).click()
-        page.wait_for_selector("text=Promo Discovery Complete", timeout=30000)
-        page.get_by_role("button", name=re.compile("Explore Generated Promos")).click()
-        page.wait_for_selector("text=Showing only your uploads")
-        page.get_by_role("button", name=re.compile(r"Show pipeline results \(60\)")).click()
-        page.wait_for_selector("text=60 clips")
-        expect("Showing only your uploads" not in page.inner_text("body"), "banner gone")
-
-    @step("9b home after an upload: continue banner; existing-results card still shows the saved 60")
-    def _():
-        tab("Overview")
-        page.get_by_role("button", name=re.compile("Upload & Generate")).first.click()
-        page.locator("input[type=file][accept*='.txt']").set_input_files([str(EP1)])
-        page.get_by_role("button", name=re.compile("Generate Beat-Aligned")).click()
-        page.wait_for_selector("text=Promo Discovery Complete", timeout=30000)
-        page.get_by_role("button", name=re.compile("Explore Generated Promos")).click()
-        page.wait_for_selector("text=Showing only your uploads")
         tab("Home")
         page.wait_for_selector("text=Continue with my uploads")
-        expect("Showing only your uploads" not in page.inner_text("body"), "upload banner hidden on Home")
-        card = page.get_by_role("button", name="Open existing results")
-        expect("60" in card.inner_text() and "50" in card.inner_text(), "card shows saved pipeline stats: " + card.inner_text()[:120])
+        expect("Promos from your uploads" not in page.inner_text("body"), "upload banner hidden on Home")
+        expect(page.locator("header nav").count() == 0, "no tabs on Home")
         page.get_by_role("button", name="Continue with my uploads").click()
-        page.wait_for_selector("text=Showing only your uploads")
-        tab("Home")
-        card.click()  # restores the saved results
-        page.wait_for_selector("text=60 clips", timeout=5000)
-        expect("Showing only your uploads" not in page.inner_text("body"), "saved results restored")
+        page.wait_for_selector("text=Promos from your uploads")
 
     @step("10 batch AI: bad key stops after 1 call and opens settings")
     def _():
@@ -329,6 +348,7 @@ with sync_playwright() as p:
         page.wait_for_selector("text=Cancelled.", timeout=15000)
         expect(page.locator("text=AI evaluating").count() == 0, "progress bar hidden afterwards")
         page.unroute("**/generativelanguage.googleapis.com/**")
+        fixture()  # judged clips changed; start the next steps from a clean upload
 
     @step("12 mobile-width layout does not overflow horizontally")
     def _():
@@ -338,7 +358,7 @@ with sync_playwright() as p:
         sw = page.evaluate("document.documentElement.scrollWidth")
         expect(sw <= 400, f"page scrollWidth {sw} > viewport 390")
 
-    @step("12b every tab fits a phone screen without sideways scrolling")
+    @step("12b every page fits a phone screen without sideways scrolling")
     def _():
         page.set_viewport_size({"width": 390, "height": 844})
         page.goto(BASE)
@@ -346,7 +366,7 @@ with sync_playwright() as p:
         wide = []
         for label, marker in [
             ("Home", "Find the promos worth posting"),
-            ("Overview", "Broken Soldier"),
+            ("Overview", "Your uploaded scripts"),
             ("Promo Explorer", "Candidate Leaderboard"),
             ("Phone Simulator", "Previewing Vertical Promo"),
             ("Compare Battle", "Promo Comparison Battle"),
@@ -359,6 +379,11 @@ with sync_playwright() as p:
             sw = page.evaluate("document.documentElement.scrollWidth")
             if sw > 395:
                 wide.append((label, sw))
+        page.goto(BASE + "#/upload")
+        page.wait_for_selector("text=Upload & Generate Promo Clips")
+        sw = page.evaluate("document.documentElement.scrollWidth")
+        if sw > 395:
+            wide.append(("Upload", sw))
         expect(not wide, f"pages wider than the phone screen: {wide}")
 
     @step("12c header: fits narrow phones, keyboard works, active tab stays in view")
@@ -377,7 +402,7 @@ with sync_playwright() as p:
         page.goto(BASE)
         page.wait_for_selector("header")
         tab("Overview")
-        page.wait_for_selector("text=Broken Soldier >> visible=true")
+        page.wait_for_selector("text=Your uploaded scripts >> visible=true")
         page.get_by_role("button", name="Kuku Promo Studio home").focus()
         page.keyboard.press("Enter")
         page.wait_for_selector("text=Find the promos worth posting", timeout=5000)
@@ -400,12 +425,12 @@ with sync_playwright() as p:
         page.goto(BASE)
         page.wait_for_selector("text=Find the promos worth posting")
         tab("Overview")
-        page.wait_for_selector("text=Broken Soldier >> visible=true")
+        page.wait_for_selector("text=Your uploaded scripts >> visible=true")
         expect(page.url.endswith("#/overview"), "URL follows the page: " + page.url)
         page.go_back()
-        page.wait_for_selector("text=Find the promos worth posting", timeout=5000)
+        page.wait_for_selector("text=Candidate Leaderboard", timeout=5000)
         page.go_forward()
-        page.wait_for_selector("text=Broken Soldier >> visible=true", timeout=5000)
+        page.wait_for_selector("text=Your uploaded scripts >> visible=true", timeout=5000)
         page.goto(BASE + "#/explorer")                    # deep link
         page.wait_for_selector("text=Candidate Leaderboard", timeout=8000)
         page.reload()                                     # refresh keeps the page
@@ -430,10 +455,10 @@ with sync_playwright() as p:
         expect(cards.first.get_attribute("aria-pressed") == "true", "back on the first card")
         # Overview's top picks are real buttons too
         tab("Overview")
-        page.wait_for_selector("text=Broken Soldier >> visible=true")
+        page.wait_for_selector("text=Your uploaded scripts >> visible=true")
         page.get_by_role("button", name=re.compile(r"Rank #2")).click()
         page.wait_for_selector("text=Candidate Leaderboard")
-        expect("Episode 24" in page.locator("button[data-cid][aria-pressed=true]").inner_text(), "opened the clicked pick")
+        expect(page.locator("button[data-cid][aria-pressed=true]").get_attribute("data-cid") == second_id, "opened the clicked pick")
 
     @step("18 hooks and cliffhangers do not get doubled quote marks")
     def _():
@@ -444,22 +469,16 @@ with sync_playwright() as p:
             body = page.inner_text("body")
             expect('""' not in body and "\u201c\u201c" not in body, f"doubled quotes shown for card #{i + 1}")
 
-    @step("19 empty data shows friendly pages, never NaN or a crash")
+    @step("19 no clips yet shows friendly pages, never NaN or a crash")
     def _():
-        page.route("**/assets/promos-*.js", lambda r: r.fulfill(
-            status=200, content_type="application/javascript", body="export default [];"))
-        page.goto(BASE)
-        page.reload()                                     # fresh load so the empty data module is used
-        page.wait_for_selector("text=No drama analysed yet", timeout=8000)
+        wipe()
         for route, text in [("overview", "Nothing to show yet"), ("explorer", "No promos to explore"),
                             ("simulator", "No clip to preview"), ("compare", "Nothing to compare"),
                             ("review", "Nothing to review")]:
             page.goto(BASE + "#/" + route)
             page.wait_for_selector(f"text={text}", timeout=8000)
             expect("NaN" not in page.inner_text("body"), f"NaN shown on {route}")
-        page.unroute("**/assets/promos-*.js")
-        page.goto(BASE)
-        page.reload()
+        fixture()
 
     @step("20 upload: every file gets a result line, and failures are explained inline")
     def _():
@@ -522,7 +541,7 @@ with sync_playwright() as p:
         page.get_by_label("Copy timecode").click()
         page.wait_for_selector("text=Copied")
         text = page.evaluate("navigator.clipboard.readText()")
-        expect(re.search(r"Episode \d+\s+\d\d:\d\d:\d\d:\d\d – \d\d:\d\d:\d\d:\d\d\s+\(", text), "timecode text: " + text)
+        expect(re.search(r"\d\d:\d\d:\d\d:\d\d – \d\d:\d\d:\d\d:\d\d\s+\(", text), "timecode text: " + text)
         page.get_by_label("Copy hook").click()
         hook = page.evaluate("navigator.clipboard.readText()")
         expect(hook and not hook.startswith('"') and not hook.endswith('"'), "hook copied without wrapper quotes: " + hook)
@@ -553,16 +572,23 @@ with sync_playwright() as p:
     def _():
         page.goto(BASE + "#/explorer")
         page.wait_for_selector("text=Candidate Leaderboard")
-        page.locator('select[aria-label="Compliance"]').select_option("PASS")
-        page.locator('input[aria-label="Minimum score"]').fill("70")
+        n = S["n"]
+        chosen = None
+        for floor in (30, 40, 50, 60, 70):
+            page.locator('input[aria-label="Minimum score"]').fill(str(floor))
+            page.wait_for_timeout(150)
+            shown = int(re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1))
+            if 0 < shown < n:
+                chosen = (floor, shown)
+                break
+        expect(chosen, "some minimum score hides part of the list")
         page.reload()
         page.wait_for_selector("text=Candidate Leaderboard")
-        expect(page.locator('select[aria-label="Compliance"]').input_value() == "PASS", "compliance filter remembered")
-        expect(page.locator('input[aria-label="Minimum score"]').input_value() == "70", "min score remembered")
+        expect(page.locator('input[aria-label="Minimum score"]').input_value() == str(chosen[0]), "min score remembered")
         shown = int(re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1))
-        expect(0 < shown < 60, f"filters are applied after refresh ({shown} shown)")
+        expect(shown == chosen[1], f"filter is applied after refresh ({shown} shown, expected {chosen[1]})")
         page.get_by_role("button", name="Reset filters").click()
-        page.wait_for_selector("text=Candidate Leaderboard (60)")
+        page.wait_for_selector(f"text=Candidate Leaderboard ({n})")
         expect(page.get_by_role("button", name="Reset filters").count() == 0, "reset button gone when nothing is filtered")
         # toasts have a close button
         page.get_by_role("button", name=re.compile("AI Model")).click()
@@ -573,7 +599,6 @@ with sync_playwright() as p:
 
     @step("25 review: no preselected verdict, key auto-repeat, dialogs, scoped counts, import validation, a11y")
     def _():
-        import json, tempfile, os
         page.goto(BASE + "#/review")
         page.evaluate("localStorage.removeItem('kuku_human_reviews')")
         page.reload()
@@ -599,7 +624,7 @@ with sync_playwright() as p:
         page.wait_for_timeout(300)
         page.keyboard.press("Escape")
         expect("1 Rejected" not in page.inner_text("body"), "R ignored while dialog open")
-        # unsaved flag
+        # clicking a verdict saves it; editing notes afterwards is flagged until saved
         page.get_by_role("radio", name=re.compile("Reject Candidate")).click()
         page.wait_for_selector("text=1 Rejected")
         expect(page.get_by_text("Saved: Rejected").count() > 0, "clicking a verdict saves it")
@@ -612,45 +637,53 @@ with sync_playwright() as p:
         page.wait_for_selector("text=Import failed")
         page.evaluate("localStorage.removeItem('kuku_human_reviews')")
 
-    @step("27 an uploaded drama survives a page refresh (and goes away when removed)")
+    @step("27 uploads survive a refresh; unjudged clips show no model score; removing all clears them")
     def _():
-        # a verdict saved on the pipeline drama must not appear on an uploaded one
-        page.goto(BASE + "#/review")
-        page.evaluate("localStorage.removeItem('kuku_human_reviews')")
-        page.reload()
-        page.wait_for_selector("text=Human Editorial Sign-Off")
-        page.keyboard.press("a")
-        page.wait_for_selector("text=1 Approved")
-        page.get_by_role("button", name="Kuku Promo Studio home").click()
-        page.get_by_role("button", name="Upload and generate").click()
-        page.wait_for_selector("text=Upload & Generate Promo Clips")
-        page.locator("input[type=file][accept*='.txt']").set_input_files([str(EP1)])
-        page.get_by_role("button", name=re.compile("Generate Beat-Aligned")).click()
-        page.wait_for_selector("text=Promo Discovery Complete", timeout=30000)
-        page.get_by_role("button", name=re.compile("Explore Generated Promos")).click()
-        page.wait_for_selector("text=Showing only your uploads")
-        page.get_by_role("button", name=re.compile("Editorial Review")).first.click()
-        page.wait_for_selector("text=Human Editorial Sign-Off")
-        expect("0 Approved" in page.inner_text("body"), "uploaded drama starts with no reviews")
-        # clips no model has judged show no model score (not a copy of the local score)
-        page.get_by_role("button", name=re.compile("Overview")).first.click()
-        page.wait_for_selector("text=Judged by the model: 0 of")
+        n = S["n"]
+        page.goto(BASE + "#/overview")
+        page.wait_for_selector(f"text=Judged by the model: 0 of {n}", timeout=10000)
         rows = page.locator("table tbody tr")
         expect(rows.first.locator("td").nth(5).inner_text().strip() == "—", "model column is a dash for unjudged clips")
-        page.get_by_role("button", name=re.compile("Promo Explorer")).first.click()
-        page.wait_for_selector("text=Candidate Leaderboard")
-        n_before = re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1)
+        page.goto(BASE + "#/explorer")
         page.reload()
-        page.wait_for_selector("text=Showing only your uploads", timeout=15000)
-        n_after = re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1)
-        expect(n_before == n_after and int(n_after) < 60, f"same uploaded clips after refresh ({n_before} -> {n_after})")
-        expect(page.get_by_role("button", name=re.compile(r"Show pipeline results \(60\)")).count() == 1, "pipeline results still stashed")
-        # removing the upload clears it for good
-        page.get_by_role("button", name=re.compile("Show pipeline results")).click()
-        page.wait_for_selector("text=Restored 60 pipeline results")
+        page.wait_for_selector("text=Promos from your uploads", timeout=15000)
+        n_after = int(re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1))
+        expect(n_after == n, f"same clips after refresh ({n} -> {n_after})")
+        # remove every uploaded file: nothing is kept, even after a refresh
+        for f in FIX:
+            page.get_by_label(re.compile("Remove " + re.escape(f.stem))).click()
+            page.wait_for_timeout(200)
+        page.wait_for_selector("text=Upload & Generate Promo Clips", timeout=5000)
         page.reload()
-        page.wait_for_timeout(800)
-        expect(page.get_by_text("Showing only your uploads").count() == 0, "upload gone after restore + refresh")
+        page.get_by_role("button", name="Kuku Promo Studio home").click()
+        page.wait_for_selector("text=Find the promos worth posting")
+        expect("Continue with my uploads" not in page.inner_text("body"), "uploads gone after removing them and refreshing")
+        fixture()
+
+    if KNOWN.exists():
+        @step("28 uploading the same files again shows the saved pipeline results (the raw outputs)")
+        def _():
+            import pandas as pd
+
+            wipe()
+            originals = PACK[:5]
+            upload(originals, explore=False)
+            expect("saved pipeline results" in page.get_by_label("File results").inner_text(), "report says saved results")
+            page.get_by_role("button", name=re.compile("Explore Generated Promos")).click()
+            page.wait_for_selector("text=Candidate Leaderboard", timeout=15000)
+            rank = pd.read_csv(ROOT / "submission" / "raw_outputs" / "ranked_promos" / "final_ranking.csv", encoding="utf-8-sig")
+            rank = rank[rank["gemini_evaluated"] == True].sort_values("rank")  # noqa: E712
+            rank = rank[rank["episode_file"].isin([f.name for f in originals])]
+            n = int(re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1))
+            expect(n == len(rank), f"same number of promos as the raw outputs ({n} vs {len(rank)})")
+            top = rank.iloc[0]
+            body = page.inner_text("body")
+            expect(str(top["hook"]).strip('"') in body, "top promo's hook matches the raw outputs: " + str(top["hook"]))
+            expect(f"{round(float(top['ranking_score']), 2):g}" in page.inner_text("header"), "top hybrid score matches the raw outputs")
+            page.goto(BASE + "#/overview")
+            page.wait_for_selector("text=Your uploaded scripts >> visible=true")
+            expect("Judged by the model" not in page.inner_text("body"), "all clips were judged by the model in the saved run")
+            fixture()
 
     @step("13 header shows the model connected from .env (key never in the browser)")
     def _():

@@ -10,6 +10,7 @@ const ExportTab = lazy(() => import('./components/ExportTab'));
 import UploadModal from './components/UploadModal';
 import ModelSettingsModal from './components/ModelSettingsModal';
 import PageSkeleton from './components/Skeleton';
+import { byScoreThenRank } from './utils/ranking';
 import { loadUpload, saveUpload, clearUpload } from './utils/uploadStore';
 import { X } from 'lucide-react';
 import {
@@ -58,10 +59,8 @@ export default function App() {
   const [candidates, setCandidates] = useState([]);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [dataReady, setDataReady] = useState(false);
-  // When the user uploads scripts, the view switches to only those clips; the
-  // pipeline results are stashed here so they can be restored.
+  // The app ships with no show data: every clip comes from the user's own uploaded screenplay files.
   const [uploadSource, setUploadSource] = useState(null); // filenames[] | null
-  const [stashedCandidates, setStashedCandidates] = useState(null);
   const [reviews, setReviews] = useState(loadReviews);
   const [isGeminiSettingsOpen, setIsGeminiSettingsOpen] = useState(false);
   const [modelLabel, setModelLabel] = useState(''); // e.g. "gemini:gemini-3.5-flash-lite", '' = none
@@ -70,29 +69,16 @@ export default function App() {
   const [batchProgress, setBatchProgress] = useState(null);
   const batchAbort = useRef(null);
 
-  // Load the promo snapshot as a separate chunk so it doesn't bloat the initial bundle.
+  // Bring back the clips from the user's earlier upload (kept in this browser), so a refresh loses nothing.
   useEffect(() => {
     let cancelled = false;
-    // import.meta.glob resolves to {} when the file is absent (it is git-ignored because it
-    // contains screenplay text), so the app still builds and starts empty.
-    const loaders = import.meta.glob('./data/promos.json');
-    const loadSnapshot = loaders['./data/promos.json'] || (async () => ({ default: [] }));
-    Promise.all([loadSnapshot(), loadUpload()])
-      .then(([m, saved]) => {
-        if (cancelled) return;
-        const list = m.default || [];
-        if (saved) {
-          // The user's uploads survive a refresh: show them again, with the pipeline results stashed.
-          setStashedCandidates(list);
-          setCandidates(saved.candidates);
-          setSelectedCandidate(saved.candidates[0] || null);
-          setUploadSource(saved.sources);
-        } else {
-          setCandidates(list);
-          setSelectedCandidate(list[0] || null);
-        }
+    loadUpload()
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        setCandidates(saved.candidates);
+        setSelectedCandidate(saved.candidates[0] || null);
+        setUploadSource(saved.sources);
       })
-      .catch((e) => console.error('Failed to load promo data', e))
       .finally(() => !cancelled && setDataReady(true));
     return () => {
       cancelled = true;
@@ -140,17 +126,14 @@ export default function App() {
   };
 
   const handlePromosGenerated = (newPromos, filenames) => {
-    // Show ONLY uploaded clips. If we're already in upload view, a further upload
-    // adds to that set; otherwise stash the pipeline results first.
-    const inUploadView = uploadSource !== null;
-    const base = inUploadView ? candidates : [];
-    if (!inUploadView) setStashedCandidates(candidates);
+    // A further upload adds to the clips already showing.
+    const base = candidates;
 
     // Skip clips already present (same episode + bounds) so re-uploads don't duplicate ids.
     const existingIds = new Set(base.map((c) => c.id));
     const fresh = newPromos.filter((c) => !existingIds.has(c.id));
     const combined = [...fresh, ...base]
-      .sort((a, b) => b.hybridScore - a.hybridScore)
+      .sort(byScoreThenRank)
       .map((c, idx) => ({ ...c, rank: idx + 1 }));
     setCandidates(combined);
     setSelectedCandidate(combined[0] || null);
@@ -172,17 +155,12 @@ export default function App() {
       .map((c, idx) => ({ ...c, rank: idx + 1 }));
 
     if (remainingSources.length === 0 || remaining.length === 0) {
-      // Nothing uploaded is left: go back to the pipeline results.
-      if (stashedCandidates) {
-        setCandidates(stashedCandidates);
-        setSelectedCandidate(stashedCandidates[0] || null);
-      } else {
-        setCandidates([]);
-        setSelectedCandidate(null);
-      }
-      setStashedCandidates(null);
+      // Nothing uploaded is left: back to the upload page.
+      setCandidates([]);
+      setSelectedCandidate(null);
       setUploadSource(null);
-      showToast(`Removed ${filename}. Back to pipeline results.`);
+      setActiveTab('upload');
+      showToast(`Removed ${filename}. Upload a drama to continue.`);
       return;
     }
 
@@ -192,25 +170,6 @@ export default function App() {
     );
     setUploadSource(remainingSources);
     showToast(`Removed ${filename}.`);
-  };
-
-  // Home page: option 1 — open the results that already exist (restoring them if an upload is showing).
-  const handleOpenExistingResults = () => {
-    if (uploadSource && stashedCandidates) {
-      handleRestorePipelineResults();
-    } else {
-      setActiveTab('overview');
-    }
-  };
-
-  const handleRestorePipelineResults = () => {
-    if (!stashedCandidates) return;
-    setCandidates(stashedCandidates);
-    setSelectedCandidate(stashedCandidates[0] || null);
-    setStashedCandidates(null);
-    setUploadSource(null);
-    setActiveTab('overview');
-    showToast(`Restored ${stashedCandidates.length} pipeline results.`);
   };
 
   // Live Single Gemini AI Evaluation Handler
@@ -223,7 +182,7 @@ export default function App() {
       const updated = await evaluateCandidateWithGemini(candidateToEvaluate);
 
       const updatedList = candidates.map((c) => (c.id === updated.id ? updated : c));
-      updatedList.sort((a, b) => b.hybridScore - a.hybridScore);
+      updatedList.sort(byScoreThenRank);
       const reranked = updatedList.map((c, idx) => ({ ...c, rank: idx + 1 }));
 
       setCandidates(reranked);
@@ -261,7 +220,7 @@ export default function App() {
 
       const evalMap = new Map(batch.candidates.map((c) => [c.id, c]));
       const updatedList = candidates.map((c) => (evalMap.has(c.id) ? evalMap.get(c.id) : c));
-      updatedList.sort((a, b) => b.hybridScore - a.hybridScore);
+      updatedList.sort(byScoreThenRank);
       const reranked = updatedList.map((c, idx) => ({ ...c, rank: idx + 1 }));
 
       setCandidates(reranked);
@@ -289,18 +248,8 @@ export default function App() {
     }
   };
 
-  // The saved pipeline results, even while an upload is being shown.
-  const pipelineList = uploadSource ? stashedCandidates || [] : candidates;
-  const pipelineSummary = {
-    show: pipelineList[0]?.show || '',
-    promos: pipelineList.length,
-    episodes: new Set(pipelineList.map((c) => c.episode)).size,
-    topScore: pipelineList.length ? Math.max(...pipelineList.map((c) => c.hybridScore || 0)) : 0,
-    pass: pipelineList.filter((c) => c.compliance === 'PASS').length,
-  };
-
   const stats = {
-    dramaName: uploadSource ? 'Your uploads' : candidates[0]?.show || '',
+    dramaName: 'Your uploads',
     totalCandidates: candidates.length,
     episodeCount: new Set(candidates.map((c) => c.episode)).size,
     topScore: candidates[0]?.hybridScore ?? 0,
@@ -373,7 +322,7 @@ export default function App() {
         <div className="bg-sky-50 border-b border-sky-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3 text-[11px] font-semibold text-sky-800">
             <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1.5">
-              <span>Showing only your uploads ({candidates.length} promos):</span>
+              <span>Promos from your uploads ({candidates.length}):</span>
               {uploadSource.map((name) => (
                 <span
                   key={name}
@@ -392,15 +341,6 @@ export default function App() {
                 </span>
               ))}
             </div>
-            {stashedCandidates && (
-              <button
-                type="button"
-                onClick={() => handleRestorePipelineResults()}
-                className="px-2.5 py-1 rounded-lg bg-white border border-sky-300 text-sky-800 hover:bg-sky-100"
-              >
-                Show pipeline results ({stashedCandidates.length})
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -414,13 +354,9 @@ export default function App() {
         <>
         {activeTab === 'home' && (
           <HomeTab
-            pipeline={pipelineSummary}
             upload={{ count: uploadSource ? candidates.length : 0, files: uploadSource || [] }}
-            onOpenResults={handleOpenExistingResults}
             onOpenUpload={() => setActiveTab('upload')}
-            onContinueUpload={() => {
-                        setActiveTab('explorer');
-            }}
+            onContinueUpload={() => setActiveTab('explorer')}
           />
         )}
 
@@ -436,7 +372,7 @@ export default function App() {
         {activeTab === 'overview' && (
           <OverviewTab
             candidates={candidates}
-            showTitle={uploadSource ? 'Your uploaded scripts' : candidates[0]?.show}
+            showTitle="Your uploaded scripts"
             onSelectCandidate={handleSelectCandidate}
             setActiveTab={setActiveTab}
           />

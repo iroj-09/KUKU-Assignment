@@ -32,11 +32,6 @@ MAX_PROMO_SECONDS = int(
     os.getenv('MAX_PROMO_SECONDS', '60')
 )
 
-# Display name of the drama being analysed (shown on the React app's Home page).
-SHOW_TITLE = os.getenv(
-    'SHOW_TITLE', 'I Married a Broken Soldier. He was a Duke.'
-)
-
 # Weight of the local heuristic in the final hybrid score (the model gets 1 - this).
 LOCAL_WEIGHT = float(
     os.getenv('LOCAL_WEIGHT', '0.30')

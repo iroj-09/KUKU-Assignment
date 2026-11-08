@@ -52,9 +52,8 @@ python scripts/score_human_check.py outputs/runs/run_<time>/human_check_sheet.cs
 
 ## 8. Review app (optional)
 ```powershell
-python scripts/sync_frontend_data.py --ranking outputs/runs/run_<time>/ranked_promos/final_ranking.csv --evaluations outputs/runs/run_<time>/editorial/editorial_evaluations.csv
-cd frontend; npm run dev        # http://localhost:3000
+cd frontend; npm run dev        # http://localhost:3000 (upload a drama's screenplay files on the Home page)
 ```
 
 ## 9. GitHub safety
-Before pushing, run `git status` and confirm that `data/`, `outputs/`, `submission/raw_outputs/`, `frontend/src/data/promos.json`, `.env` and `.venv/` are not staged. Keep the source screenplays and derived outputs private.
+Before pushing, run `git status` and confirm that `data/`, `outputs/`, `submission/raw_outputs/`, `.env` and `.venv/` are not staged. Keep the source screenplays and derived outputs private.

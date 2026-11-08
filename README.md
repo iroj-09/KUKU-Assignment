@@ -24,7 +24,7 @@ Results land in `outputs/runs/run_<time>/ranked_promos/`:
 | `final_ranking.csv` | full table behind the ranking |
 | `top_10_*` | DaVinci / Premiere markers and a CMX 3600 EDL |
 
-Useful flags: `--no-llm` (free, no API key: local heuristic ranking only), `--limit 10` (ask the model about only 10 clips), `--max-episodes 3` (quick test), `--output <folder>`, `--sync-frontend` (refresh the React app's data).
+Useful flags: `--no-llm` (free, no API key: local heuristic ranking only), `--limit 10` (ask the model about only 10 clips), `--max-episodes 3` (quick test), `--output <folder>`.
 
 ## Connect any model (model name + API key)
 
@@ -92,14 +92,15 @@ python -m ruff check .        # Python lint (pip install -r requirements-dev.txt
 ## Review app (optional)
 
 ```bash
-python scripts/sync_frontend_data.py      # builds the app's data from outputs/
 cd frontend && npm install && npm run dev  # http://localhost:3000
 ```
 
-The Home page shows the drama's name; set it with `SHOW_TITLE` in `.env` or `--show-title` (`sync_frontend_data.py` / `run_all.py --sync-frontend`) when you analyse a different show.
+The app contains no show data. On the Home page you upload a drama's screenplay files (.txt, .srt, .fountain); promo windows are found in your browser (no API cost) and your AI model can judge the best few. Then explore and compare clips, simulate the vertical-phone preview, sign off as a human reviewer (backup/import supported) and export NLE markers. Everything stays in your browser, including after a refresh.
 
-Explore and compare clips, simulate the vertical-phone preview, sign off as a human reviewer (backup/import supported), upload new scripts in the browser, and export NLE markers. The app starts empty if `frontend/src/data/promos.json` is absent.
+**Same files, same answer.** Run `python scripts/build_known_results.py` once after a pipeline run. Uploading one of the pack's files again then shows the promos the pipeline found in it (the same ranking as `submission/raw_outputs/`, marked "saved pipeline results" in the upload report); any other file is processed in the browser. That data holds screenplay text, so it is git-ignored and exists only on this machine.
+
+To deploy it, publish `frontend/dist` (`npm run build`) on any static host such as Vercel or Netlify. Build it from a clean clone (e.g. let Vercel build from GitHub) so the saved screenplay-derived results are not included. The deployed app has no `.env`, so open **AI Model** in the app and enter a model name and API key (kept in your browser only); without one it still finds and ranks promos by rules.
 
 ## Confidentiality
 
-Screenplays and everything generated from them (`data/`, `outputs/`, `frontend/src/data/promos.json`) are git-ignored. Do not publish them. `.env` holds your API key and is also ignored; commit `.env.example` only.
+Screenplays and everything generated from them (`data/`, `outputs/`) are git-ignored. Do not publish them. `.env` holds your API key and is also ignored; commit `.env.example` only.

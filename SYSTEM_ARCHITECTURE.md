@@ -160,4 +160,4 @@ pytest -v
 * `test_nle_export` — PASSED
 * `test_gemini_response_schema_validation` — PASSED
 
-Additional regression tests (43 Python tests in total via `pytest`, plus 30 frontend tests via `npm test` and a 30-step real-browser smoke test (`scripts/ui_smoke_test.py`) in `frontend/`) cover the shared hook/cliffhanger windows, dialogue-only WPM, overlap deduplication, frame-accurate EDL export, the uploaded-script parser and the Gemini batch abort/cancel logic.
+Additional regression tests (43 Python tests in total via `pytest`, plus 30 frontend tests via `npm test` and a 29-step real-browser smoke test (`scripts/ui_smoke_test.py`) in `frontend/`) cover the shared hook/cliffhanger windows, dialogue-only WPM, overlap deduplication, frame-accurate EDL export, the uploaded-script parser and the Gemini batch abort/cancel logic.

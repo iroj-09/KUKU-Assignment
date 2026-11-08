@@ -67,9 +67,6 @@ def main() -> None:
     ap.add_argument("--no-llm", action="store_true", help="skip the model: rank by the local heuristic only (free)")
     ap.add_argument("--limit", type=int, default=None, help="evaluate only the first N shortlisted clips with the model")
     ap.add_argument("--batch-size", type=int, default=5, help="clips per model request")
-    ap.add_argument("--show-title", default=None, help="drama name for the React app (default: SHOW_TITLE in .env)")
-    ap.add_argument("--sync-frontend", action="store_true",
-                    help="also refresh frontend/src/data/promos.json from this run")
     args = ap.parse_args()
 
     # Shell/CLI values beat .env, so these also reach every pipeline step (they inherit this environment).
@@ -99,7 +96,7 @@ def main() -> None:
             sys.exit(f"{err}\nSet the credentials, or run with --no-llm for a free local-only ranking.")
         print(f"Model: {llm.describe()}")
 
-    total = (6 if args.no_llm else 8) + (1 if args.sync_frontend and not args.no_llm else 0)
+    total = 6 if args.no_llm else 8
     started = time.time()
 
     batch = ["src/run_batch.py", "--input", str(input_dir), "--output", str(raw),
@@ -150,12 +147,6 @@ def main() -> None:
                                "--output-dir", str(ranked)], total, 7)
         step("Submission export", ["src/export_submission.py", "--ranking", str(ranked / "final_ranking.csv"),
                                    "--evaluations", str(evaluations), "--output-dir", str(ranked)], total, 8)
-        if args.sync_frontend:
-            sync = ["scripts/sync_frontend_data.py", "--ranking", str(ranked / "final_ranking.csv"),
-                    "--evaluations", str(evaluations.with_suffix(".csv"))]
-            if args.show_title:
-                sync += ["--show-title", args.show_title]
-            step("Refresh React app data", sync, total, 9)
 
     print(f"\nFinished in {time.time() - started:.0f}s. Results: {ranked}")
     print(f"  Readable list: {ranked / 'promos_submission.md'}")
