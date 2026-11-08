@@ -35,3 +35,4 @@ submission/raw_outputs/
 # Old app snapshot with screenplay text (no longer used by the app) and the zip of raw outputs
 frontend/src/data/
 submission/raw_outputs_for_drive.zip
+submission/drive_package/

@@ -25,7 +25,7 @@
 <body>
 
 <h1>Find the Promos — screenplay in, ranked promo list out</h1>
-<div class="sub"><span class="fill">[Your name · roll no. · branch]</span> · Problem 1 · Prototype: <span class="fill">[repo link]</span> · Raw outputs: <span class="fill">[folder link]</span> · Video: <span class="fill">[link]</span></div>
+<div class="sub">Praveen Roj · Enrolment 23117103 · Mechanical Engineering, IIT Roorkee · praveen_r@me.iitr.ac.in · Problem 1 · App: https://kuku-assignment.vercel.app/ · Code: https://github.com/iroj-09/KUKU-Assignment · Raw outputs: in the submission Drive folder</div>
 
 <h2>1. Why Problem 1, and how I scoped it</h2>
 <p>It is a weekly bottleneck (an editor watches every episode of every new show), it comes with real data (50 episodes), and its output is checkable: an episode, start/end times, a hook, a cliffhanger. I scoped it to <b>one step of the editor's work: producing a ranked shortlist of candidate promos</b>. The editor still watches and cuts; the tool decides where to look first.</p>
@@ -42,7 +42,7 @@
 <table>
   <tr><th style="width:13%">Code (free, deterministic)</th><td>Parse screenplays → build every valid window (<b>53,182</b> windows in 16 s) → cheap keyword/cadence score → keep best 12 per episode (600) → drop overlaps (<b>60</b>) → cut out each clip's first 3 s and last 5 s as evidence → <b>re-check every timestamp the model returns</b> against those windows → rank.</td></tr>
   <tr><th>AI (one job)</th><td>For the 60 shortlisted clips only: find the hook and the cliffhanger <i>inside the evidence windows</i>, score hook / cliffhanger / stakes / stand-alone clarity / progression, write one line on why it works, list risks. JSON is schema-validated; an out-of-window or missing timestamp is never trusted, it downgrades the clip to PARTIAL/FAIL.</td></tr>
-  <tr><th>Human</th><td>Review app (approve / reject / notes, backup + import), and an 18-clip check sheet that turns "looks good" into an accuracy number.</td></tr>
+  <tr><th>Human</th><td>Review app (approve / reject / notes, backup + import); every shortlisted clip is a candidate for a person to approve or reject.</td></tr>
 </table>
 <p><b>Re-runnable:</b> <code>python run_all.py --input &lt;folder&gt;</code> runs all 8 steps (<code>--no-llm</code> works with no API key). <b>Model is swappable</b> by environment variable (Gemini, any OpenAI-compatible API, Anthropic); a test runs the whole evaluator against a fake non-Gemini server.</p>
 
@@ -67,7 +67,7 @@
 <p><b>Note:</b> the numbers above come from the pipeline itself (not from a manual accuracy check), so they show where the tool is weak, not how often it is right.</p>
 
 <h2>7. AI tools I used — and where they got it wrong</h2>
-<p><b>Claude Code</b> (built and refactored the pipeline, wrote tests), <b>Gemini 3.5 Flash-Lite</b> (the judge inside the pipeline) <span class="fill">[+ any other tools you used]</span>. <b>Where it was wrong:</b> the AI-written docs and my earlier results claimed "beat-aligned windows", but the saved outputs actually came from the 5-second sliding windows. Nothing flagged it; I only noticed when a fresh run shared <b>0 of 74</b> clips with the old one. Fix: regenerate everything, archive the old run, and add tests for the parameters that drifted. Also: Gemini as judge praises almost everything, so I do not rely on its score without the human sheet.</p>
+<p><b>Claude Code</b> (built and refactored the pipeline, wrote tests), <b>Gemini 3.5 Flash-Lite</b> (the judge inside the pipeline). <b>Where it was wrong:</b> the AI-written docs and my earlier results claimed "beat-aligned windows", but the saved outputs actually came from the 5-second sliding windows. Nothing flagged it; I only noticed when a fresh run shared <b>0 of 74</b> clips with the old one. Fix: regenerate everything, archive the old run, and add tests for the parameters that drifted. Also: Gemini as judge praises almost everything, so its score is one input to the ranking, not the final word.</p>
 
 <h2>8. Next</h2>
 <p>Label ~50 clips with an editor and fit the weights; build joined and cross-episode promos; pick shortlists for variety so each episode offers 2–3 options; run the cinematic cues (acting, pacing) through video once available.</p>
