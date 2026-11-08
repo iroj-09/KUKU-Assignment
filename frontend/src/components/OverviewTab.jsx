@@ -36,7 +36,9 @@ export default function OverviewTab({ candidates, onSelectCandidate, setActiveTa
   const failCount = candidates.filter((c) => c.compliance === 'FAIL').length;
   const unverifiedCount = candidates.filter((c) => c.compliance === 'UNVERIFIED').length;
   const episodeCount = new Set(candidates.map((c) => c.episode)).size;
-  const avgGemini = (candidates.reduce((acc, c) => acc + (c.geminiScore || 0), 0) / candidates.length).toFixed(1);
+  // Only clips a model has actually judged have a model score; the rest show a dash, not a made-up number.
+  const judged = candidates.filter((c) => c.geminiScore != null);
+  const avgGemini = judged.length ? (judged.reduce((acc, c) => acc + c.geminiScore, 0) / judged.length).toFixed(1) : '—';
   const promisingCount = candidates.filter((c) => c.isPromising).length;
 
   return (
@@ -100,7 +102,9 @@ export default function OverviewTab({ candidates, onSelectCandidate, setActiveTa
             <TrendingUp className="w-3.5 h-3.5 text-amber-500" />
           </div>
           <div className="text-2xl font-extrabold text-amber-600">{avgGemini} <span className="text-xs font-normal text-slate-500">/ 100</span></div>
-          <div className="text-[11px] text-slate-500 mt-1">Editorial rubric evaluation</div>
+          <div className="text-[11px] text-slate-500 mt-1">
+            {judged.length === candidates.length ? 'Editorial rubric evaluation' : `Judged by the model: ${judged.length} of ${candidates.length}`}
+          </div>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs">
@@ -201,7 +205,7 @@ export default function OverviewTab({ candidates, onSelectCandidate, setActiveTa
                 <th className="py-3 px-4">Window</th>
                 <th className="py-3 px-4">Duration</th>
                 <th className="py-3 px-4">Hybrid</th>
-                <th className="py-3 px-4">Gemini</th>
+                <th className="py-3 px-4">Model</th>
                 <th className="py-3 px-4">Compliance</th>
                 <th className="py-3 px-4">Hook Highlight</th>
                 <th className="py-3 px-4">Action</th>
@@ -219,7 +223,7 @@ export default function OverviewTab({ candidates, onSelectCandidate, setActiveTa
                   <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">{c.clipStart}s–{c.clipEnd}s</td>
                   <td className="py-3.5 px-4 text-slate-600">{c.duration}s</td>
                   <td className="py-3.5 px-4 font-extrabold text-emerald-600">{c.hybridScore}</td>
-                  <td className="py-3.5 px-4 font-bold text-amber-600">{c.geminiScore}</td>
+                  <td className="py-3.5 px-4 font-bold text-amber-600">{c.geminiScore ?? <span className="font-medium text-slate-400" title="Not judged by a model yet">—</span>}</td>
                   <td className="py-3.5 px-4">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                       c.compliance === 'PASS'

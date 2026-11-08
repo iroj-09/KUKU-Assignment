@@ -64,7 +64,7 @@
   <li><b>The model is a lenient judge:</b> 58 of 60 "promising", scores only spread ±7.6, so ranks near each other are not meaningfully different.</li>
   <li><b>Needs earlier episodes:</b> 12 of 60 list this as a risk; mean stand-alone score falls from 8.2 (early) to 7.6 (late episodes).</li>
 </ul></div></div>
-<p><b>Human check:</b> <span class="fill">[Fill in after checking the 18 clips in <code>human_check_sheet.csv</code> and running <code>score_human_check.py</code>: e.g. "I agreed with the hook on x/18, the cliffhanger on y/18, and would post z of the top 10."]</span> Until that is filled, the numbers above show where the tool is weak, not how often it is right.</p>
+<p><b>Note:</b> the numbers above come from the pipeline itself (not from a manual accuracy check), so they show where the tool is weak, not how often it is right.</p>
 
 <h2>7. AI tools I used — and where they got it wrong</h2>
 <p><b>Claude Code</b> (built and refactored the pipeline, wrote tests), <b>Gemini 3.5 Flash-Lite</b> (the judge inside the pipeline) <span class="fill">[+ any other tools you used]</span>. <b>Where it was wrong:</b> the AI-written docs and my earlier results claimed "beat-aligned windows", but the saved outputs actually came from the 5-second sliding windows. Nothing flagged it; I only noticed when a fresh run shared <b>0 of 74</b> clips with the old one. Fix: regenerate everything, archive the old run, and add tests for the parameters that drifted. Also: Gemini as judge praises almost everything, so I do not rely on its score without the human sheet.</p>

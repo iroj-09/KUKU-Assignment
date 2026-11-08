@@ -106,7 +106,7 @@ export default function CompareTab({ candidates, seed }) {
           <div className="space-y-2 text-xs">
             <div className="flex justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100">
               <span className="text-slate-500">Gemini LLM Score:</span>
-              <span className="font-bold text-slate-900">{candA?.geminiScore} / 100</span>
+              <span className="font-bold text-slate-900">{candA?.geminiScore == null ? 'not judged' : `${candA.geminiScore} / 100`}</span>
             </div>
             <div className="flex justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100">
               <span className="text-slate-500">Hook Impact:</span>
@@ -166,7 +166,7 @@ export default function CompareTab({ candidates, seed }) {
           <div className="space-y-2 text-xs">
             <div className="flex justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100">
               <span className="text-slate-500">Gemini LLM Score:</span>
-              <span className="font-bold text-slate-900">{candB?.geminiScore} / 100</span>
+              <span className="font-bold text-slate-900">{candB?.geminiScore == null ? 'not judged' : `${candB.geminiScore} / 100`}</span>
             </div>
             <div className="flex justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100">
               <span className="text-slate-500">Hook Impact:</span>

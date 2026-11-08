@@ -54,7 +54,13 @@ def expect(cond, msg="assertion failed"):
 
 
 def tab(label):
-    page.get_by_role("button", name=re.compile(label)).first.click()
+    # Page tabs exist only once a drama is open; from Home, open the saved drama first.
+    btn = page.get_by_role("button", name=re.compile(label)).first
+    if not btn.is_visible():
+        page.get_by_role("button", name="Open existing results").click()
+        page.wait_for_timeout(300)
+        btn = page.get_by_role("button", name=re.compile(label)).first
+    btn.click()
     page.wait_for_timeout(300)
 
 
@@ -78,7 +84,7 @@ with sync_playwright() as p:
         expect("Episodes:" not in page.inner_text("header"), "Home header should not show drama stats")
         # ...they appear on the drama's own pages
         tab("Overview")
-        page.wait_for_selector("text=Broken Soldier")
+        page.wait_for_selector("text=Broken Soldier >> visible=true")
         txt = page.inner_text("header")
         expect(re.search(r"Episodes:\s*50", txt) and "60 clips" in txt, "header stats on Overview: " + txt[:200])
         tab("Home")  # the next step starts from Home
@@ -93,7 +99,7 @@ with sync_playwright() as p:
         expect(card.is_enabled(), "existing-results card enabled")
         expect("60" in card.inner_text() and "50" in card.inner_text(), "card shows the real stats")
         card.click()
-        page.wait_for_selector("text=Broken Soldier", timeout=5000)          # Overview page
+        page.wait_for_selector("text=Broken Soldier >> visible=true", timeout=5000)          # Overview page
         tab("Home")
         page.get_by_role("button", name="Upload and generate").click()
         page.wait_for_selector("text=Upload & Generate Promo Clips", timeout=5000)  # upload page
@@ -113,7 +119,7 @@ with sync_playwright() as p:
             ("Overview", "Broken Soldier"),
         ]:
             tab(label)
-            page.wait_for_selector(f"text={marker}", timeout=5000)
+            page.wait_for_selector(f"text={marker} >> visible=true", timeout=5000)
 
     @step("3 explorer: filters show real counts, nothing hidden by default")
     def _():
@@ -348,7 +354,7 @@ with sync_playwright() as p:
             ("Export NLE", "Export & NLE Delivery Station"),
         ]:
             tab(label)
-            page.wait_for_selector(f"text={marker}", timeout=8000)
+            page.wait_for_selector(f"text={marker} >> visible=true", timeout=8000)
             page.wait_for_timeout(250)
             sw = page.evaluate("document.documentElement.scrollWidth")
             if sw > 395:
@@ -371,7 +377,7 @@ with sync_playwright() as p:
         page.goto(BASE)
         page.wait_for_selector("header")
         tab("Overview")
-        page.wait_for_selector("text=Broken Soldier")
+        page.wait_for_selector("text=Broken Soldier >> visible=true")
         page.get_by_role("button", name="Kuku Promo Studio home").focus()
         page.keyboard.press("Enter")
         page.wait_for_selector("text=Find the promos worth posting", timeout=5000)
@@ -394,12 +400,12 @@ with sync_playwright() as p:
         page.goto(BASE)
         page.wait_for_selector("text=Find the promos worth posting")
         tab("Overview")
-        page.wait_for_selector("text=Broken Soldier")
+        page.wait_for_selector("text=Broken Soldier >> visible=true")
         expect(page.url.endswith("#/overview"), "URL follows the page: " + page.url)
         page.go_back()
         page.wait_for_selector("text=Find the promos worth posting", timeout=5000)
         page.go_forward()
-        page.wait_for_selector("text=Broken Soldier", timeout=5000)
+        page.wait_for_selector("text=Broken Soldier >> visible=true", timeout=5000)
         page.goto(BASE + "#/explorer")                    # deep link
         page.wait_for_selector("text=Candidate Leaderboard", timeout=8000)
         page.reload()                                     # refresh keeps the page
@@ -424,7 +430,7 @@ with sync_playwright() as p:
         expect(cards.first.get_attribute("aria-pressed") == "true", "back on the first card")
         # Overview's top picks are real buttons too
         tab("Overview")
-        page.wait_for_selector("text=Broken Soldier")
+        page.wait_for_selector("text=Broken Soldier >> visible=true")
         page.get_by_role("button", name=re.compile(r"Rank #2")).click()
         page.wait_for_selector("text=Candidate Leaderboard")
         expect("Episode 24" in page.locator("button[data-cid][aria-pressed=true]").inner_text(), "opened the clicked pick")
@@ -595,13 +601,56 @@ with sync_playwright() as p:
         expect("1 Rejected" not in page.inner_text("body"), "R ignored while dialog open")
         # unsaved flag
         page.get_by_role("radio", name=re.compile("Reject Candidate")).click()
-        expect(page.get_by_text("Unsaved changes").count() > 0, "unsaved flag shown")
+        page.wait_for_selector("text=1 Rejected")
+        expect(page.get_by_text("Saved: Rejected").count() > 0, "clicking a verdict saves it")
+        page.locator("textarea").fill("trim 1s")
+        expect(page.get_by_text("Unsaved changes").count() > 0, "unsaved flag shown after editing notes")
         # invalid import is rejected
         bad = os.path.join(tempfile.mkdtemp(), "bad.json")
         open(bad, "w", encoding="utf-8").write(json.dumps({"reviews": {"x": {"status": "Banana"}}}))
         page.locator("input[type=file][accept*='json']").set_input_files(bad)
         page.wait_for_selector("text=Import failed")
         page.evaluate("localStorage.removeItem('kuku_human_reviews')")
+
+    @step("27 an uploaded drama survives a page refresh (and goes away when removed)")
+    def _():
+        # a verdict saved on the pipeline drama must not appear on an uploaded one
+        page.goto(BASE + "#/review")
+        page.evaluate("localStorage.removeItem('kuku_human_reviews')")
+        page.reload()
+        page.wait_for_selector("text=Human Editorial Sign-Off")
+        page.keyboard.press("a")
+        page.wait_for_selector("text=1 Approved")
+        page.get_by_role("button", name="Kuku Promo Studio home").click()
+        page.get_by_role("button", name="Upload and generate").click()
+        page.wait_for_selector("text=Upload & Generate Promo Clips")
+        page.locator("input[type=file][accept*='.txt']").set_input_files([str(EP1)])
+        page.get_by_role("button", name=re.compile("Generate Beat-Aligned")).click()
+        page.wait_for_selector("text=Promo Discovery Complete", timeout=30000)
+        page.get_by_role("button", name=re.compile("Explore Generated Promos")).click()
+        page.wait_for_selector("text=Showing only your uploads")
+        page.get_by_role("button", name=re.compile("Editorial Review")).first.click()
+        page.wait_for_selector("text=Human Editorial Sign-Off")
+        expect("0 Approved" in page.inner_text("body"), "uploaded drama starts with no reviews")
+        # clips no model has judged show no model score (not a copy of the local score)
+        page.get_by_role("button", name=re.compile("Overview")).first.click()
+        page.wait_for_selector("text=Judged by the model: 0 of")
+        rows = page.locator("table tbody tr")
+        expect(rows.first.locator("td").nth(5).inner_text().strip() == "—", "model column is a dash for unjudged clips")
+        page.get_by_role("button", name=re.compile("Promo Explorer")).first.click()
+        page.wait_for_selector("text=Candidate Leaderboard")
+        n_before = re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1)
+        page.reload()
+        page.wait_for_selector("text=Showing only your uploads", timeout=15000)
+        n_after = re.search(r"Candidate Leaderboard \((\d+)\)", page.inner_text("body")).group(1)
+        expect(n_before == n_after and int(n_after) < 60, f"same uploaded clips after refresh ({n_before} -> {n_after})")
+        expect(page.get_by_role("button", name=re.compile(r"Show pipeline results \(60\)")).count() == 1, "pipeline results still stashed")
+        # removing the upload clears it for good
+        page.get_by_role("button", name=re.compile("Show pipeline results")).click()
+        page.wait_for_selector("text=Restored 60 pipeline results")
+        page.reload()
+        page.wait_for_timeout(800)
+        expect(page.get_by_text("Showing only your uploads").count() == 0, "upload gone after restore + refresh")
 
     @step("13 header shows the model connected from .env (key never in the browser)")
     def _():

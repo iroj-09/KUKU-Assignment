@@ -10,6 +10,7 @@ const ExportTab = lazy(() => import('./components/ExportTab'));
 import UploadModal from './components/UploadModal';
 import ModelSettingsModal from './components/ModelSettingsModal';
 import PageSkeleton from './components/Skeleton';
+import { loadUpload, saveUpload, clearUpload } from './utils/uploadStore';
 import { X } from 'lucide-react';
 import {
   evaluateCandidateWithGemini,
@@ -76,12 +77,20 @@ export default function App() {
     // contains screenplay text), so the app still builds and starts empty.
     const loaders = import.meta.glob('./data/promos.json');
     const loadSnapshot = loaders['./data/promos.json'] || (async () => ({ default: [] }));
-    loadSnapshot()
-      .then((m) => {
+    Promise.all([loadSnapshot(), loadUpload()])
+      .then(([m, saved]) => {
         if (cancelled) return;
         const list = m.default || [];
-        setCandidates(list);
-        setSelectedCandidate(list[0] || null);
+        if (saved) {
+          // The user's uploads survive a refresh: show them again, with the pipeline results stashed.
+          setStashedCandidates(list);
+          setCandidates(saved.candidates);
+          setSelectedCandidate(saved.candidates[0] || null);
+          setUploadSource(saved.sources);
+        } else {
+          setCandidates(list);
+          setSelectedCandidate(list[0] || null);
+        }
       })
       .catch((e) => console.error('Failed to load promo data', e))
       .finally(() => !cancelled && setDataReady(true));
@@ -89,6 +98,13 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // Keep the uploaded clips (including AI re-ranking and removals) saved while they are showing.
+  useEffect(() => {
+    if (!dataReady) return;
+    if (uploadSource) saveUpload(uploadSource, candidates);
+    else clearUpload();
+  }, [dataReady, uploadSource, candidates]);
 
   // Which model is connected? (the project's .env via the local proxy, or a key saved in this browser)
   useEffect(() => {
@@ -284,6 +300,7 @@ export default function App() {
   };
 
   const stats = {
+    dramaName: uploadSource ? 'Your uploads' : candidates[0]?.show || '',
     totalCandidates: candidates.length,
     episodeCount: new Set(candidates.map((c) => c.episode)).size,
     topScore: candidates[0]?.hybridScore ?? 0,
@@ -378,7 +395,7 @@ export default function App() {
             {stashedCandidates && (
               <button
                 type="button"
-                onClick={handleRestorePipelineResults}
+                onClick={() => handleRestorePipelineResults()}
                 className="px-2.5 py-1 rounded-lg bg-white border border-sky-300 text-sky-800 hover:bg-sky-100"
               >
                 Show pipeline results ({stashedCandidates.length})
@@ -401,7 +418,9 @@ export default function App() {
             upload={{ count: uploadSource ? candidates.length : 0, files: uploadSource || [] }}
             onOpenResults={handleOpenExistingResults}
             onOpenUpload={() => setActiveTab('upload')}
-            onContinueUpload={() => setActiveTab('explorer')}
+            onContinueUpload={() => {
+                        setActiveTab('explorer');
+            }}
           />
         )}
 

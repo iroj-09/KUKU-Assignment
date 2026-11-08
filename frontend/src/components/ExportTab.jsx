@@ -58,7 +58,7 @@ export default function ExportTab({ candidates, reviews }) {
       const review = reviews?.[c.id];
       rows.push([
         c.rank, c.episode, c.clipStart, c.clipEnd, c.duration,
-        c.hybridScore, c.geminiScore, c.localScore, c.compliance,
+        c.hybridScore, c.geminiScore ?? '', c.localScore, c.compliance,
         c.hook, c.cliffhanger, c.whyItWorks, c.wpm,
         review?.status || 'Pending', review?.note || review?.notes || ''
       ]);

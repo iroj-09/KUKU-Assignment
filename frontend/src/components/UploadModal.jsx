@@ -102,7 +102,8 @@ export default function UploadModal({ isOpen, onClose, onPromosGenerated, asPage
         const parsed = parseFile(text, file.name);
         const candidates = generateCandidatesFromScript(parsed, minDur, maxDur, maxPerScript);
         // Tag each clip with its source file so it can be removed per-file later.
-        allGenerated.push(...candidates.map((c) => ({ ...c, sourceFile: file.name })));
+        // Uploaded clips get their own ids, so reviews saved for the pipeline drama never show up on them.
+        allGenerated.push(...candidates.map((c) => ({ ...c, id: `upload:${file.name}|${c.id}`, sourceFile: file.name })));
         report.push({ name: file.name, status: candidates.length ? 'ok' : 'empty', count: candidates.length });
       } catch (err) {
         console.error(`Error processing ${file.name}:`, err);

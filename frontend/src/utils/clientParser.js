@@ -270,7 +270,7 @@ export function generateCandidatesFromScript(parsed, minDuration = 20, maxDurati
         clipEnd: Number(clipEnd.toFixed(1)),
         duration: Number(duration.toFixed(1)),
         hybridScore: totalHeuristic,
-        geminiScore: totalHeuristic,
+        geminiScore: null, // no model has judged this clip yet; only the local score exists
         localScore: totalHeuristic,
         // Not checked against Gemini evidence yet (mirrors the Python pipeline's UNVERIFIED).
         compliance: 'UNVERIFIED',

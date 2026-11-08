@@ -355,8 +355,10 @@ export default function ReviewTab({ candidates, reviews, setReviews, selectedCan
                   role="radio"
                   aria-checked={isSelected}
                   onClick={() => {
+                    // Clicking a verdict saves it right away (with the notes typed so far).
                     setDecision(btn.id);
-                    setSavedNote('');
+                    persistReviews({ ...reviews, [current.id]: buildReview(btn.id, notes) });
+                    setSavedNote(`Saved: ${btn.id}`);
                   }}
                   className={`p-3.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all ${
                     isSelected ? btn.activeClass : btn.inactiveClass
@@ -368,7 +370,7 @@ export default function ReviewTab({ candidates, reviews, setReviews, selectedCan
               );
             })}
           </div>
-          {!decision && <p className="text-[11px] text-slate-400">Choose a verdict (or press A / R / N) to save this clip.</p>}
+          {!decision && <p className="text-[11px] text-slate-400">Click a verdict (or press A / R / N) to save this clip.</p>}
         </div>
 
         {/* Notes Textarea */}

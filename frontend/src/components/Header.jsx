@@ -9,13 +9,15 @@ export default function Header({
   onOpenGeminiSettings,
   modelLabel = '',
 }) {
+  // Numbers describe the drama being viewed, so they show on its pages only, not on Home/Upload.
+  const onDramaPage = activeTab !== 'home' && activeTab !== 'upload';
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'overview', label: 'Overview', icon: Layers },
     { id: 'explorer', label: 'Promo Explorer', icon: Film },
     { id: 'simulator', label: 'Phone Simulator', icon: Smartphone },
     { id: 'compare', label: 'Compare Battle', icon: SplitSquareVertical },
-    { id: 'review', label: 'Editorial Review', icon: CheckSquare, badge: stats.reviewedCount },
+    { id: 'review', label: 'Editorial Review', icon: CheckSquare, badge: onDramaPage ? stats.reviewedCount : 0 },
     { id: 'export', label: 'Export NLE', icon: Download },
   ];
 
@@ -33,7 +35,7 @@ export default function Header({
     const ro = new ResizeObserver(measureNav); // also fires once on observe, giving the first measurement
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [onDramaPage]);
   useEffect(() => {
     navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   }, [activeTab]);
@@ -67,10 +69,16 @@ export default function Header({
 
           {/* Global Stats & Action CTAs */}
           <div className="flex shrink-0 items-center space-x-2 sm:space-x-3 pl-2">
-            {/* Numbers describe the drama being viewed, so they appear on its pages only, not on Home/Upload
-                where nothing has been chosen yet. */}
-            {activeTab !== 'home' && activeTab !== 'upload' && (
-            <div className="hidden xl:flex items-center space-x-6 text-xs mr-2">
+            {onDramaPage && (
+            <div className="hidden xl:flex items-center space-x-5 text-xs mr-2">
+              {stats.dramaName && (
+                <>
+                  <div className="max-w-[11rem] truncate text-right font-bold text-slate-900" title={stats.dramaName}>
+                    {stats.dramaName}
+                  </div>
+                  <div className="w-px h-6 bg-slate-200" />
+                </>
+              )}
               <div className="text-right">
                 <span className="text-slate-500">Episodes: </span>
                 <span className="font-bold text-slate-900">{stats.episodeCount}</span>
@@ -114,7 +122,8 @@ export default function Header({
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation: only once a drama is open (Home/Upload is where one is chosen) */}
+        {onDramaPage && (
         <nav
           ref={navRef}
           aria-label="Main"
@@ -149,6 +158,7 @@ export default function Header({
             );
           })}
         </nav>
+        )}
       </div>
     </header>
   );

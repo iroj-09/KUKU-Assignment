@@ -122,7 +122,7 @@ export default function ExplorerTab({
       .sort((a, b) => {
         if (sortBy === 'rank') return (a.rank || 999) - (b.rank || 999);
         if (sortBy === 'score_desc') return b.hybridScore - a.hybridScore;
-        if (sortBy === 'gemini_desc') return b.geminiScore - a.geminiScore;
+        if (sortBy === 'gemini_desc') return (b.geminiScore ?? -1) - (a.geminiScore ?? -1);
         if (sortBy === 'duration_asc') return a.duration - b.duration;
         return 0;
       });
@@ -422,7 +422,9 @@ export default function ExplorerTab({
               </div>
               <div>
                 <div className="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Gemini LLM</div>
-                <div className="text-xl font-bold text-amber-600 mt-0.5">{activeCandidate.geminiScore}</div>
+                <div className="text-xl font-bold text-amber-600 mt-0.5" title={activeCandidate.geminiScore == null ? 'Not judged by a model yet' : undefined}>
+                  {activeCandidate.geminiScore ?? '—'}
+                </div>
               </div>
               <div>
                 <div className="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Local Heuristic</div>
