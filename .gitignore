@@ -36,3 +36,5 @@ submission/raw_outputs/
 frontend/src/data/
 submission/raw_outputs_for_drive.zip
 submission/drive_package/
+submission/*.zip
+submission/ranked_promos.csv

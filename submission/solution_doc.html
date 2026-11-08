@@ -25,7 +25,7 @@
 <body>
 
 <h1>Find the Promos — screenplay in, ranked promo list out</h1>
-<div class="sub">Praveen Roj · Enrolment 23117103 · Mechanical Engineering, IIT Roorkee · praveen_r@me.iitr.ac.in · Problem 1 · App: https://kuku-assignment.vercel.app/ · Code: https://github.com/iroj-09/KUKU-Assignment · Raw outputs: in the submission Drive folder</div>
+<div class="sub">Praveen Roj · Enrolment 23117103 · Mechanical Engineering, IIT Roorkee · praveen_r@me.iitr.ac.in · Problem 1 · App: https://kuku-assignment.vercel.app/ · Code: https://github.com/iroj-09/KUKU-Assignment · Output: ranked_promos.csv (60 promos, in the submission file)</div>
 
 <h2>1. Why Problem 1, and how I scoped it</h2>
 <p>It is a weekly bottleneck (an editor watches every episode of every new show), it comes with real data (50 episodes), and its output is checkable: an episode, start/end times, a hook, a cliffhanger. I scoped it to <b>one step of the editor's work: producing a ranked shortlist of candidate promos</b>. The editor still watches and cuts; the tool decides where to look first.</p>
@@ -68,6 +68,8 @@
 
 <h2>7. AI tools I used — and where they got it wrong</h2>
 <p><b>Claude Code</b> (built and refactored the pipeline, wrote tests), <b>Gemini 3.5 Flash-Lite</b> (the judge inside the pipeline). <b>Where it was wrong:</b> the AI-written docs and my earlier results claimed "beat-aligned windows", but the saved outputs actually came from the 5-second sliding windows. Nothing flagged it; I only noticed when a fresh run shared <b>0 of 74</b> clips with the old one. Fix: regenerate everything, archive the old run, and add tests for the parameters that drifted. Also: Gemini as judge praises almost everything, so its score is one input to the ranking, not the final word.</p>
+
+<p><b>Note on the deployed app:</b> it ships no screenplay data (confidential), so for a new upload it runs a lightweight in-browser heuristic (3 clips per script by default) and the optional AI pass. The full pipeline result for the input pack (60 promos with heuristic and model scores) is <code>ranked_promos.csv</code>.</p>
 
 <h2>8. Next</h2>
 <p>Label ~50 clips with an editor and fit the weights; build joined and cross-episode promos; pick shortlists for variety so each episode offers 2–3 options; run the cinematic cues (acting, pacing) through video once available.</p>

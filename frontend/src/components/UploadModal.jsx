@@ -38,7 +38,7 @@ export default function UploadModal({ isOpen, onClose, onPromosGenerated, asPage
   const [isProcessing, setIsProcessing] = useState(false);
   const [minDur, setMinDur] = useState(20);
   const [maxDur, setMaxDur] = useState(60);
-  const [maxPerScript, setMaxPerScript] = useState(6);
+  const [maxPerScript, setMaxPerScript] = useState(3);
   const [useGeminiAuto, setUseGeminiAuto] = useState(false);
   const [progressMsg, setProgressMsg] = useState('');
   const [generatedResults, setGeneratedResults] = useState(null);
